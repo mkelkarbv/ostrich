@@ -2,29 +2,44 @@ package com.bazaarvoice.ostrich.dropwizard.healthcheck;
 
 import com.yammer.metrics.core.HealthCheck;
 import org.joda.time.DateTime;
+import org.joda.time.Seconds;
 
 import java.util.Random;
 
 public class CachedHealthCheck extends HealthCheck {
-    private HealthCheck healthCheck;
     private static Random RANDOM = new Random();
-    private DateTime nextCheckTime;
-    private Result lastResult;
+
+    private HealthCheck _healthCheck;
+    private DateTime _nextCheckTime;
+    private Result _lastResult;
 
     public CachedHealthCheck(HealthCheck healthCheck) {
         super(healthCheck.getName());
-        this.healthCheck = healthCheck;
-        nextCheckTime = DateTime.now();
+        _healthCheck = healthCheck;
+        _nextCheckTime = DateTime.now();
     }
 
     @Override
     public Result check() throws Exception {
         DateTime now = DateTime.now();
-        if(lastResult == null || !lastResult.isHealthy() || now.isAfter(nextCheckTime)){
-            lastResult = healthCheck.execute();
+        if(_lastResult == null || now.isAfter(_nextCheckTime)){
+            _lastResult = _healthCheck.execute();
             // If we're healthy, back off for a random amount of time (30-60 seconds) so that we don't overwhelm or swarm the dependency
-            nextCheckTime = now.plusSeconds(30 + RANDOM.nextInt(30));
+            _nextCheckTime = now.plusSeconds(30 + RANDOM.nextInt(30));
         }
-        return lastResult;
+
+        Seconds seconds = Seconds.secondsBetween(now, _nextCheckTime);
+        String resultMessage = _lastResult.getMessage();
+        String cachedMessage = " [cached - refresh " + seconds.getSeconds() +  "s]";
+        if(resultMessage == null) {
+            resultMessage = "";
+        }
+        String message = resultMessage + cachedMessage;
+
+        if(_lastResult.isHealthy()) {
+            return Result.healthy(message);
+        } else {
+            return Result.unhealthy(message);
+        }
     }
 }

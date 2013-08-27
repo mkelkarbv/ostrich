@@ -9,12 +9,12 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class NumHealthyEndPointsCheck extends HealthCheck {
-    private ServicePool<?> pool;
+    private ServicePool<?> _pool;
 
     public NumHealthyEndPointsCheck(ServicePool<?> pool, String name) {
         super(name);
         checkArgument(!Strings.isNullOrEmpty(name));
-        this.pool = checkNotNull(pool);
+        _pool = checkNotNull(pool);
     }
 
     public NumHealthyEndPointsCheck(Object proxy, String name) {
@@ -24,8 +24,8 @@ public class NumHealthyEndPointsCheck extends HealthCheck {
     @Override
     protected Result check()
             throws Exception {
-        int numValidEndPoints = pool.getNumValidEndPoints();
-        int numBadEndPoints = pool.getNumBadEndPoints();
+        int numValidEndPoints = _pool.getNumValidEndPoints();
+        int numBadEndPoints = _pool.getNumBadEndPoints();
 
         if(numValidEndPoints == 0 && numBadEndPoints == 0) {
             return Result.unhealthy("No end points.");

@@ -13,67 +13,67 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 public class NumHealthyEndPointsCheckTest {
-    private final String name = "test";
-    @SuppressWarnings("unchecked") private final ServicePool<Service> pool = mock(ServicePool.class);
-    InvocationHandler invocationHandler = mock(InvocationHandler.class);
-    private final Object proxy = Proxy.newProxyInstance(Service.class.getClassLoader(), new Class[] {Service.class}, invocationHandler);
+    private final String _name = "test";
+    @SuppressWarnings("unchecked") private final ServicePool<Service> _pool = mock(ServicePool.class);
+    private final InvocationHandler _invocationHandler = mock(InvocationHandler.class);
+    private final Service _proxy = (Service)Proxy.newProxyInstance(Service.class.getClassLoader(), new Class[] {Service.class}, _invocationHandler);
 
     @Test (expected = NullPointerException.class)
     public void testNullPool() {
-        new NumHealthyEndPointsCheck(null, name);
+        new NumHealthyEndPointsCheck(null, _name);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testNullServiceName() {
-        new NumHealthyEndPointsCheck(pool, null);
+        new NumHealthyEndPointsCheck(_pool, null);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testEmptyServiceName() {
-        new NumHealthyEndPointsCheck(pool, "");
+        new NumHealthyEndPointsCheck(_pool, "");
     }
 
     //todo - how to test this
     @Test
     public void testPoolProxy() {
-        new NumHealthyEndPointsCheck(proxy, name);
+        new NumHealthyEndPointsCheck(_proxy, _name);
     }
 
     @Test
     public void testEmptyResult() {
-        when(pool.getNumValidEndPoints()).thenReturn(0);
-        when(pool.getNumBadEndPoints()).thenReturn(0);
-        HealthCheck check = new NumHealthyEndPointsCheck(pool, name);
+        when(_pool.getNumValidEndPoints()).thenReturn(0);
+        when(_pool.getNumBadEndPoints()).thenReturn(0);
+        HealthCheck check = new NumHealthyEndPointsCheck(_pool, _name);
 
         assertFalse(check.execute().isHealthy());
     }
 
     @Test
     public void testOnlyUnhealthyResult() {
-        when(pool.getNumValidEndPoints()).thenReturn(0);
-        when(pool.getNumBadEndPoints()).thenReturn(2);
+        when(_pool.getNumValidEndPoints()).thenReturn(0);
+        when(_pool.getNumBadEndPoints()).thenReturn(2);
 
-        HealthCheck check = new NumHealthyEndPointsCheck(pool, name);
+        HealthCheck check = new NumHealthyEndPointsCheck(_pool, _name);
 
         assertFalse(check.execute().isHealthy());
     }
 
     @Test
     public void testOnlyHealthyResult() {
-        when(pool.getNumValidEndPoints()).thenReturn(2);
-        when(pool.getNumBadEndPoints()).thenReturn(0);
+        when(_pool.getNumValidEndPoints()).thenReturn(2);
+        when(_pool.getNumBadEndPoints()).thenReturn(0);
 
-        HealthCheck check = new NumHealthyEndPointsCheck(pool, name);
+        HealthCheck check = new NumHealthyEndPointsCheck(_pool, _name);
 
         assertTrue(check.execute().isHealthy());
     }
 
     @Test
     public void testBothResults() {
-        when(pool.getNumValidEndPoints()).thenReturn(1);
-        when(pool.getNumBadEndPoints()).thenReturn(1);
+        when(_pool.getNumValidEndPoints()).thenReturn(1);
+        when(_pool.getNumBadEndPoints()).thenReturn(1);
 
-        HealthCheck check = new NumHealthyEndPointsCheck(pool, name);
+        HealthCheck check = new NumHealthyEndPointsCheck(_pool, _name);
 
         assertTrue(check.execute().isHealthy());
     }

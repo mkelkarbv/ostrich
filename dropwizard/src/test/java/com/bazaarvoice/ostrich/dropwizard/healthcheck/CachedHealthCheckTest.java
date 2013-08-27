@@ -6,7 +6,6 @@ import org.mockito.Mockito;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -38,7 +37,7 @@ public class CachedHealthCheckTest {
         check = cachedCheck.execute();
         assertFalse(check.isHealthy());
 
-        verify(unhealthyCheck, times(2)).execute();
+        verify(unhealthyCheck).execute();
     }
 
     interface Service {}
