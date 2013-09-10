@@ -16,7 +16,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * point, so beware the possibility of overloading your services with health checks if this is run excessively.
  */
 public class ContainsHealthyEndPointCheck extends HealthCheck {
-    private ServicePool<?> _pool;
+    private final ServicePool<?> _pool;
 
     /**
      * Constructs a health check for the given pool that will show as healthy if it has at least one healthy end point.
