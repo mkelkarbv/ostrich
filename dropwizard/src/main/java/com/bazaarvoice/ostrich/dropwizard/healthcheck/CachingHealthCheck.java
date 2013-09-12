@@ -12,10 +12,10 @@ import java.util.concurrent.locks.ReentrantLock;
  * only a single thread will execute {@code check()} after the cached results have become stale.  Utilizing this
  * health check will prevent overloading your services, even if run excessively.
  */
-public class CachedHealthCheck extends HealthCheck {
+public class CachingHealthCheck extends HealthCheck {
     private final HealthCheck _healthCheck;
-    private final Duration _refreshTime;
-    private final Duration _staleTime;
+    private final Duration _minTTL;
+    private final Duration _maxTTL;
     private final Lock _lock = new ReentrantLock();
     private volatile CachedResult _cachedResult = null;
 
@@ -24,22 +24,22 @@ public class CachedHealthCheck extends HealthCheck {
      * and will attempt to update the result after 60 seconds, declaring cached result stale after 90 seconds.
      * @param healthCheck The {@code HealthCheck} to call and cache results of.
      */
-    public CachedHealthCheck(HealthCheck healthCheck) {
+    public CachingHealthCheck(HealthCheck healthCheck) {
         this(healthCheck, Duration.standardSeconds(60), Duration.standardSeconds(90));
     }
 
     /**
      * Constructs a cached health check that will show as healthy if the provided health check shows as healthy,
-     * and will attempt to update the result after {@code refreshTime} seconds, declaring cached result stale after {@code staleTime} seconds.
+     * and will attempt to update the result after {@code minTTL} seconds, declaring cached result stale after {@code maxTTL} seconds.
      * @param healthCheck The {@code HealthCheck} to call and cache results of.
-     * @param refreshTime The {@code Duration} to wait before attempting to refresh the result by executing {@code check()}
-     * @param staleTime The {@code Duration} to wait before declaring a cached result stale.
+     * @param minTTL The {@code Duration} to wait before attempting to refresh the result by executing {@code healthCheck.check()}
+     * @param maxTTL The {@code Duration} to wait before declaring a cached result stale.
      */
-    public CachedHealthCheck(HealthCheck healthCheck, Duration refreshTime, Duration staleTime) {
+    public CachingHealthCheck(HealthCheck healthCheck, Duration minTTL, Duration maxTTL) {
         super(healthCheck.getName());
         _healthCheck = healthCheck;
-        _refreshTime = refreshTime;
-        _staleTime = staleTime;
+        _minTTL = minTTL;
+        _maxTTL = maxTTL;
     }
 
     @Override
@@ -86,11 +86,11 @@ public class CachedHealthCheck extends HealthCheck {
     }
 
     private boolean isYoungEnough(CachedResult cachedResult) {
-        return now().isBefore(cachedResult.getTime().plus(_refreshTime));
+        return now().isBefore(cachedResult.getTime().plus(_minTTL));
     }
 
     private boolean isNotExpired(CachedResult cachedResult) {
-        return now().isBefore(cachedResult.getTime().plus(_staleTime));
+        return now().isBefore(cachedResult.getTime().plus(_maxTTL));
     }
 
     private DateTime now() {

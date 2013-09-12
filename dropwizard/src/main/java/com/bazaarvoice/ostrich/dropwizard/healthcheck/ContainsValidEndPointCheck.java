@@ -10,10 +10,10 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * A simple health check that verifies a pool has at least one valid endpoint. This class will not execute a
- * health check directly, rather it uses a cached count in the ServicePool, so you will not overload your
- * dependencies with health checks if this is run excessively.
+ * health check directly, rather it accesses a cached count in the ServicePool via {@link com.bazaarvoice.ostrich.ServicePool#getNumValidEndPoints()},
+ * so you will not overload your dependencies with health checks if this is run excessively.
  */
-public class NumHealthyEndPointsCheck extends HealthCheck {
+public class ContainsValidEndPointCheck extends HealthCheck {
     private final ServicePool<?> _pool;
 
     /**
@@ -22,7 +22,7 @@ public class NumHealthyEndPointsCheck extends HealthCheck {
      * @param pool The {@code ServicePool} to look for valid end points in.
      * @param name The name of the health check. May not be empty or null.
      */
-    public NumHealthyEndPointsCheck(ServicePool<?> pool, String name) {
+    public ContainsValidEndPointCheck(ServicePool<?> pool, String name) {
         super(name);
         checkArgument(!Strings.isNullOrEmpty(name));
         _pool = checkNotNull(pool);
@@ -35,8 +35,8 @@ public class NumHealthyEndPointsCheck extends HealthCheck {
      * @param proxy The {@code ServicePoolProxy} containing the service pool to look for valid end points in.
      * @param name  The name of the health check. May not be empty or null.
      */
-    public static NumHealthyEndPointsCheck forProxy(Object proxy, String name) {
-        return new NumHealthyEndPointsCheck(ServicePoolProxies.getPool(proxy), name);
+    public static ContainsValidEndPointCheck forProxy(Object proxy, String name) {
+        return new ContainsValidEndPointCheck(ServicePoolProxies.getPool(proxy), name);
     }
 
     @Override

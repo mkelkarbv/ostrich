@@ -9,12 +9,12 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-public class CachedHealthCheckTest {
+public class CachingHealthCheckTest {
     @Test
     public void testCheckHealthy() {
         HealthCheck healthyCheck = Mockito.mock(HealthCheck.class);
         when(healthyCheck.execute()).thenReturn(HealthCheck.Result.healthy());
-        CachedHealthCheck cachedCheck = new CachedHealthCheck(healthyCheck);
+        CachingHealthCheck cachedCheck = new CachingHealthCheck(healthyCheck);
 
         // Execute check twice, should only call inner check once
         HealthCheck.Result check = cachedCheck.execute();
@@ -29,9 +29,9 @@ public class CachedHealthCheckTest {
     public void testCheckUnhealthy() {
         HealthCheck unhealthyCheck = Mockito.mock(HealthCheck.class);
         when(unhealthyCheck.execute()).thenReturn(HealthCheck.Result.unhealthy("test"));
-        CachedHealthCheck cachedCheck = new CachedHealthCheck(unhealthyCheck);
+        CachingHealthCheck cachedCheck = new CachingHealthCheck(unhealthyCheck);
 
-        // Execute check twice, should call inner check twice since it's unhealthy
+        // Execute check twice, should only call inner check once
         HealthCheck.Result check = cachedCheck.execute();
         assertFalse(check.isHealthy());
         check = cachedCheck.execute();

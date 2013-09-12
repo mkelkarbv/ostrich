@@ -1,9 +1,7 @@
 package com.bazaarvoice.ostrich.dropwizard.healthcheck;
 
 import com.bazaarvoice.ostrich.ServicePool;
-import com.bazaarvoice.ostrich.pool.ServicePoolProxyHelper;
 import com.yammer.metrics.core.HealthCheck;
-import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertFalse;
@@ -11,36 +9,30 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-public class NumHealthyEndPointsCheckWithProxyTest {
+public class ContainsValidEndPointCheckTest {
     private final String _name = "test";
     @SuppressWarnings("unchecked") private final ServicePool<Service> _pool = mock(ServicePool.class);
-    private Service _proxy;
-
-    @Before
-    public void setUp() {
-        _proxy = ServicePoolProxyHelper.createMock(Service.class, _pool);
-    }
 
     @Test (expected = NullPointerException.class)
     public void testNullPool() {
-        NumHealthyEndPointsCheck.forProxy(null, _name);
+        new ContainsValidEndPointCheck(null, _name);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testNullServiceName() {
-        NumHealthyEndPointsCheck.forProxy(_proxy, null);
+        new ContainsValidEndPointCheck(_pool, null);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testEmptyServiceName() {
-        NumHealthyEndPointsCheck.forProxy(_proxy, "");
+        new ContainsValidEndPointCheck(_pool, "");
     }
 
     @Test
     public void testEmptyResult() {
         when(_pool.getNumValidEndPoints()).thenReturn(0);
         when(_pool.getNumBadEndPoints()).thenReturn(0);
-        HealthCheck check = NumHealthyEndPointsCheck.forProxy(_proxy, _name);
+        HealthCheck check = new ContainsValidEndPointCheck(_pool, _name);
 
         assertFalse(check.execute().isHealthy());
     }
@@ -50,7 +42,7 @@ public class NumHealthyEndPointsCheckWithProxyTest {
         when(_pool.getNumValidEndPoints()).thenReturn(0);
         when(_pool.getNumBadEndPoints()).thenReturn(2);
 
-        HealthCheck check = NumHealthyEndPointsCheck.forProxy(_proxy, _name);
+        HealthCheck check = new ContainsValidEndPointCheck(_pool, _name);
 
         assertFalse(check.execute().isHealthy());
     }
@@ -60,7 +52,7 @@ public class NumHealthyEndPointsCheckWithProxyTest {
         when(_pool.getNumValidEndPoints()).thenReturn(2);
         when(_pool.getNumBadEndPoints()).thenReturn(0);
 
-        HealthCheck check = NumHealthyEndPointsCheck.forProxy(_proxy, _name);
+        HealthCheck check = new ContainsValidEndPointCheck(_pool, _name);
 
         assertTrue(check.execute().isHealthy());
     }
@@ -70,7 +62,7 @@ public class NumHealthyEndPointsCheckWithProxyTest {
         when(_pool.getNumValidEndPoints()).thenReturn(1);
         when(_pool.getNumBadEndPoints()).thenReturn(1);
 
-        HealthCheck check = NumHealthyEndPointsCheck.forProxy(_proxy, _name);
+        HealthCheck check = new ContainsValidEndPointCheck(_pool, _name);
 
         assertTrue(check.execute().isHealthy());
     }
