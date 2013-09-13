@@ -19,16 +19,16 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+@SuppressWarnings("unchecked")
 public class ContainsHealthyEndPointCheckWithProxyTest {
     private static final HealthCheckResult HEALTHY = mock(HealthCheckResult.class);
     private static final HealthCheckResult UNHEALTHY = mock(HealthCheckResult.class);
 
-    private final String _name = "test";
-    @SuppressWarnings("unchecked") private final ServicePool<Service> _pool = mock(ServicePool.class);
+    private final ServicePool<Service> _pool = mock(ServicePool.class);
     private final HealthCheckResults _results = mock(HealthCheckResults.class);
 
     private Service _proxy;
-
+    private HealthCheck _check;
 
     @Before
     public void setup() {
@@ -53,11 +53,12 @@ public class ContainsHealthyEndPointCheckWithProxyTest {
         });
 
         _proxy = ServicePoolProxyHelper.createMock(Service.class, _pool);
+        _check = ContainsHealthyEndPointCheck.forProxy(_proxy, "test");
     }
 
     @Test (expected = NullPointerException.class)
     public void testNullPool() {
-        ContainsHealthyEndPointCheck.forProxy(null, _name);
+        ContainsHealthyEndPointCheck.forProxy(null, "test");
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -72,27 +73,21 @@ public class ContainsHealthyEndPointCheckWithProxyTest {
 
     @Test
     public void testEmptyResult() {
-        HealthCheck check = ContainsHealthyEndPointCheck.forProxy(_proxy, _name);
-
-        assertFalse(check.execute().isHealthy());
+        assertFalse(_check.execute().isHealthy());
     }
 
     @Test
     public void testOnlyUnhealthyResult() {
         when(_results.getUnhealthyResults()).thenReturn(ImmutableList.of(UNHEALTHY));
 
-        HealthCheck check = ContainsHealthyEndPointCheck.forProxy(_proxy, _name);
-
-        assertFalse(check.execute().isHealthy());
+        assertFalse(_check.execute().isHealthy());
     }
 
     @Test
     public void testOnlyHealthyResult() {
         when(_results.getHealthyResult()).thenReturn(HEALTHY);
 
-        HealthCheck check = ContainsHealthyEndPointCheck.forProxy(_proxy, _name);
-
-        assertTrue(check.execute().isHealthy());
+        assertTrue(_check.execute().isHealthy());
     }
 
     @Test
@@ -100,9 +95,7 @@ public class ContainsHealthyEndPointCheckWithProxyTest {
         when(_results.getHealthyResult()).thenReturn(HEALTHY);
         when(_results.getUnhealthyResults()).thenReturn(ImmutableList.of(UNHEALTHY));
 
-        HealthCheck check = ContainsHealthyEndPointCheck.forProxy(_proxy, _name);
-
-        assertTrue(check.execute().isHealthy());
+        assertTrue(_check.execute().isHealthy());
     }
 
     interface Service {}

@@ -16,16 +16,20 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class ContainsValidEndPointCheck extends HealthCheck {
     private final ServicePool<?> _pool;
 
+    private ContainsValidEndPointCheck(ServicePool<?> pool, String name) {
+        super(name);
+        checkArgument(!Strings.isNullOrEmpty(name));
+        _pool = checkNotNull(pool);
+    }
+
     /**
-     * Constructs a health check for the given pool that will show as healthy if it has at least one valid end point.
+     * Returns a newly constructed health check for the given pool that will show as healthy if it has at least one valid end point.
      *
      * @param pool The {@code ServicePool} to look for valid end points in.
      * @param name The name of the health check. May not be empty or null.
      */
-    public ContainsValidEndPointCheck(ServicePool<?> pool, String name) {
-        super(name);
-        checkArgument(!Strings.isNullOrEmpty(name));
-        _pool = checkNotNull(pool);
+    public static ContainsValidEndPointCheck forPool(ServicePool<?> pool, String name) {
+        return new ContainsValidEndPointCheck(pool, name);
     }
 
     /**

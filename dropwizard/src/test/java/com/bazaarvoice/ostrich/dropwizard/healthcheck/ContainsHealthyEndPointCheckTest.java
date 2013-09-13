@@ -18,14 +18,15 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+@SuppressWarnings("unchecked")
 public class ContainsHealthyEndPointCheckTest {
     private static final HealthCheckResult HEALTHY = mock(HealthCheckResult.class);
     private static final HealthCheckResult UNHEALTHY = mock(HealthCheckResult.class);
 
-    private final String _name = "test";
-    @SuppressWarnings("unchecked") private final ServicePool<Service> _pool = mock(ServicePool.class);
+    private final ServicePool<Service> _pool = mock(ServicePool.class);
     private final HealthCheckResults _results = mock(HealthCheckResults.class);
 
+    private HealthCheck _check;
 
     @Before
     public void setup() {
@@ -48,46 +49,42 @@ public class ContainsHealthyEndPointCheckTest {
                 return Iterables.concat(ImmutableList.of(_results.getHealthyResult()), _results.getUnhealthyResults());
             }
         });
+
+        _check = ContainsHealthyEndPointCheck.forPool(_pool, "test");
     }
 
     @Test(expected = NullPointerException.class)
     public void testNullPool() {
-        new ContainsHealthyEndPointCheck(null, _name);
+        ContainsHealthyEndPointCheck.forPool(null, "test");
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testNullServiceName() {
-        new ContainsHealthyEndPointCheck(_pool, null);
+        ContainsHealthyEndPointCheck.forPool(_pool, null);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testEmptyServiceName() {
-        new ContainsHealthyEndPointCheck(_pool, "");
+        ContainsHealthyEndPointCheck.forPool(_pool, "");
     }
 
     @Test
     public void testEmptyResult() {
-        HealthCheck check = new ContainsHealthyEndPointCheck(_pool, _name);
-
-        assertFalse(check.execute().isHealthy());
+        assertFalse(_check.execute().isHealthy());
     }
 
     @Test
     public void testOnlyUnhealthyResult() {
         when(_results.getUnhealthyResults()).thenReturn(ImmutableList.of(UNHEALTHY));
 
-        HealthCheck check = new ContainsHealthyEndPointCheck(_pool, _name);
-
-        assertFalse(check.execute().isHealthy());
+        assertFalse(_check.execute().isHealthy());
     }
 
     @Test
     public void testOnlyHealthyResult() {
         when(_results.getHealthyResult()).thenReturn(HEALTHY);
 
-        HealthCheck check = new ContainsHealthyEndPointCheck(_pool, _name);
-
-        assertTrue(check.execute().isHealthy());
+        assertTrue(_check.execute().isHealthy());
     }
 
     @Test
@@ -95,9 +92,7 @@ public class ContainsHealthyEndPointCheckTest {
         when(_results.getHealthyResult()).thenReturn(HEALTHY);
         when(_results.getUnhealthyResults()).thenReturn(ImmutableList.of(UNHEALTHY));
 
-        HealthCheck check = new ContainsHealthyEndPointCheck(_pool, _name);
-
-        assertTrue(check.execute().isHealthy());
+        assertTrue(_check.execute().isHealthy());
     }
 
     interface Service {}

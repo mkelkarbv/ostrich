@@ -11,19 +11,22 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+@SuppressWarnings("unchecked")
 public class ContainsValidEndPointCheckWithProxyTest {
-    private final String _name = "test";
-    @SuppressWarnings("unchecked") private final ServicePool<Service> _pool = mock(ServicePool.class);
+    private final ServicePool<Service> _pool = mock(ServicePool.class);
+
     private Service _proxy;
+    private HealthCheck _check;
 
     @Before
     public void setUp() {
         _proxy = ServicePoolProxyHelper.createMock(Service.class, _pool);
+        _check = ContainsValidEndPointCheck.forProxy(_proxy, "test");
     }
 
     @Test (expected = NullPointerException.class)
     public void testNullPool() {
-        ContainsValidEndPointCheck.forProxy(null, _name);
+        ContainsValidEndPointCheck.forProxy(null, "test");
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -40,9 +43,8 @@ public class ContainsValidEndPointCheckWithProxyTest {
     public void testEmptyResult() {
         when(_pool.getNumValidEndPoints()).thenReturn(0);
         when(_pool.getNumBadEndPoints()).thenReturn(0);
-        HealthCheck check = ContainsValidEndPointCheck.forProxy(_proxy, _name);
 
-        assertFalse(check.execute().isHealthy());
+        assertFalse(_check.execute().isHealthy());
     }
 
     @Test
@@ -50,9 +52,7 @@ public class ContainsValidEndPointCheckWithProxyTest {
         when(_pool.getNumValidEndPoints()).thenReturn(0);
         when(_pool.getNumBadEndPoints()).thenReturn(2);
 
-        HealthCheck check = ContainsValidEndPointCheck.forProxy(_proxy, _name);
-
-        assertFalse(check.execute().isHealthy());
+        assertFalse(_check.execute().isHealthy());
     }
 
     @Test
@@ -60,9 +60,7 @@ public class ContainsValidEndPointCheckWithProxyTest {
         when(_pool.getNumValidEndPoints()).thenReturn(2);
         when(_pool.getNumBadEndPoints()).thenReturn(0);
 
-        HealthCheck check = ContainsValidEndPointCheck.forProxy(_proxy, _name);
-
-        assertTrue(check.execute().isHealthy());
+        assertTrue(_check.execute().isHealthy());
     }
 
     @Test
@@ -70,9 +68,7 @@ public class ContainsValidEndPointCheckWithProxyTest {
         when(_pool.getNumValidEndPoints()).thenReturn(1);
         when(_pool.getNumBadEndPoints()).thenReturn(1);
 
-        HealthCheck check = ContainsValidEndPointCheck.forProxy(_proxy, _name);
-
-        assertTrue(check.execute().isHealthy());
+        assertTrue(_check.execute().isHealthy());
     }
 
     interface Service {}
