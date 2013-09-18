@@ -19,7 +19,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class ContainsHealthyEndPointCheck extends HealthCheck {
     private final ServicePool<?> _pool;
 
-    private ContainsHealthyEndPointCheck(ServicePool<?> pool, String name) {
+    protected ContainsHealthyEndPointCheck(ServicePool<?> pool, String name) {
         super(name);
         checkArgument(!Strings.isNullOrEmpty(name));
         _pool = checkNotNull(pool);
