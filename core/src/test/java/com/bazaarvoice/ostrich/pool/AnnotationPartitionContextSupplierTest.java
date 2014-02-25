@@ -116,6 +116,28 @@ public class AnnotationPartitionContextSupplierTest {
         assertEquals(ImmutableMap.<String, Object>of("", "value"), partitionContext.asMap());
     }
 
+    @Test
+    public void testSubclassInheritedMethod() throws Exception {
+        PartitionContextSupplier contextSupplier =
+                new AnnotationPartitionContextSupplier(MyExtendedService.class, MyExtendedServiceImpl.class);
+        PartitionContext partitionContext = contextSupplier.forCall(
+                MyExtendedService.class.getMethod("unnamed", String.class),
+                "value");
+
+        assertEquals(ImmutableMap.<String, Object>of("", "value"), partitionContext.asMap());
+    }
+
+    @Test
+    public void testSubclassNewMethod() throws Exception {
+        PartitionContextSupplier contextSupplier =
+                new AnnotationPartitionContextSupplier(MyExtendedService.class, MyExtendedServiceImpl.class);
+        PartitionContext partitionContext = contextSupplier.forCall(
+                MyExtendedService.class.getMethod("extension", String.class),
+                "value");
+
+        assertEquals(ImmutableMap.<String, Object>of("", "value"), partitionContext.asMap());
+    }
+
     private static interface MyService {
         void noArgs();
         void unnamed(String string);
@@ -126,6 +148,10 @@ public class AnnotationPartitionContextSupplierTest {
         void twoArgsOneKey(int num, String string);
         void threeKey(String a1, String a2, String a3);
         List covariant(String string);
+    }
+
+    private static interface MyExtendedService extends MyService {
+        void extension(String string);
     }
 
     private static class MyServiceImpl implements MyService {
@@ -147,6 +173,11 @@ public class AnnotationPartitionContextSupplierTest {
         public void threeKey(@PartitionKey String x, @PartitionKey ("b") String y, @PartitionKey ("c") String z) {}
         @Override
         public ArrayList covariant(@PartitionKey String string) {return null;}
+    }
+
+    private static class MyExtendedServiceImpl extends MyServiceImpl implements MyExtendedService {
+        @Override
+        public void extension(@PartitionKey String string) { }
     }
 
     private static class MyServiceDup extends MyServiceImpl {

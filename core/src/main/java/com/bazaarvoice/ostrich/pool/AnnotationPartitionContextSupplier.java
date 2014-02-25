@@ -36,7 +36,7 @@ class AnnotationPartitionContextSupplier implements PartitionContextSupplier {
         checkArgument(ifc.isAssignableFrom(impl));
 
         ImmutableMap.Builder<Method, String[]> builder = ImmutableMap.builder();
-        for (Method ifcMethod : ifc.getDeclaredMethods()) {
+        for (Method ifcMethod : ifc.getMethods()) {
             Method implMethod;
             try {
                 implMethod = impl.getMethod(ifcMethod.getName(), ifcMethod.getParameterTypes());
