@@ -67,45 +67,42 @@ public abstract class Metrics implements Closeable {
             _prefix = MetricRegistry.name(_class);
         }
 
-        public <T> Gauge<T> gauge(String serviceName, String name, Gauge<T> metric) {
+        public synchronized <T> Gauge<T> gauge(String serviceName, String name, Gauge<T> metric) {
             checkNotNullOrEmpty(serviceName);
             checkNotNullOrEmpty(name);
             checkNotNull(metric);
             return _metrics.register(name(serviceName, name), metric);
         }
 
-        public Counter counter(String serviceName, String name) {
+        public synchronized Counter counter(String serviceName, String name) {
             checkNotNullOrEmpty(serviceName);
             checkNotNullOrEmpty(name);
             return _metrics.counter(name(serviceName, name));
         }
 
-        public Histogram histogram(String serviceName, String name) {
+        public synchronized Histogram histogram(String serviceName, String name) {
             checkNotNullOrEmpty(serviceName);
             checkNotNullOrEmpty(name);
             return _metrics.histogram(name(serviceName, name));
         }
 
-        public Meter meter(String serviceName, String name) {
+        public synchronized Meter meter(String serviceName, String name) {
             checkNotNullOrEmpty(serviceName);
             checkNotNullOrEmpty(name);
             return _metrics.meter(name(serviceName, name));
         }
 
-        public Timer timer(String serviceName, String name) {
+        public synchronized Timer timer(String serviceName, String name) {
             checkNotNullOrEmpty(serviceName);
             checkNotNullOrEmpty(name);
             return _metrics.timer(name(serviceName, name));
         }
 
         @Override
-        public void close() {
-            _metrics.removeMatching(new MetricFilter() {
-                @Override
-                public boolean matches(String name, Metric metric) {
-                    return _names.contains(name);
-                }
-            });
+        public synchronized void close() {
+            for (String name : _names) {
+                _metrics.remove(name);
+            }
             _names.clear();
         }
 
@@ -138,7 +135,7 @@ public abstract class Metrics implements Closeable {
         }
 
         @SuppressWarnings("unchecked")
-        public <T> Gauge<T> gauge(String name, Gauge<T> gauge) {
+        public synchronized <T> Gauge<T> gauge(String name, Gauge<T> gauge) {
             checkNotNullOrEmpty(name);
             checkNotNull(gauge);
 
@@ -153,26 +150,39 @@ public abstract class Metrics implements Closeable {
             return metric;
         }
 
-        public Counter counter(String name) {
+        public synchronized Counter counter(String name) {
             checkNotNullOrEmpty(name);
             return _registry.counter(name(name));
         }
 
-        public Histogram histogram(String name) {
+        public synchronized Histogram histogram(String name) {
             checkNotNullOrEmpty(name);
             return _registry.histogram(name(name));
         }
 
-        public Meter meter(String name) {
+        public synchronized Meter meter(String name) {
             checkNotNullOrEmpty(name);
             return _registry.meter(name(name));
         }
 
-        public Timer timer(String name) {
+        public synchronized Timer timer(String name) {
             checkNotNullOrEmpty(name);
             return _registry.timer(name(name));
         }
 
+        @Override
+        public synchronized void close() {
+            _instanceCounter.dec();
+            if (_instanceCounter.getCount() == 0) {
+                _registry.remove(_instanceCounterName);
+            }
+
+            for (String name : _names) {
+                _registry.remove(name);
+            }
+            _names.clear();
+        }
+        
         @VisibleForTesting
         Counter getInstanceCounter() {
             return _instanceCounter;
@@ -183,21 +193,6 @@ public abstract class Metrics implements Closeable {
             String fullName = MetricRegistry.name(_prefix, _serviceName, name);
             _names.add(fullName);
             return fullName;
-        }
-
-        @Override
-        public void close() {
-            _instanceCounter.dec();
-            _registry.removeMatching(new MetricFilter() {
-                @Override
-                public boolean matches(String name, Metric metric) {
-                    if (name.equals(_instanceCounterName) && _instanceCounter.getCount() != 0) {
-                        return false;
-                    }
-                    return _names.contains(name);
-                }
-            });
-            _names.clear();
         }
     }
 
