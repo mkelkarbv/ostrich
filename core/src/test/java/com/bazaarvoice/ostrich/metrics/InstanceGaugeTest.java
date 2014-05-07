@@ -5,22 +5,22 @@ import org.junit.Test;
 import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
 
-import static junit.framework.Assert.assertEquals;
+import static org.junit.Assert.assertEquals;
 
 public class InstanceGaugeTest {
     private final InstanceGauge _gauge = new InstanceGauge();
 
     @Test
     public void testValueStartsAtZero() {
-        assertEquals(0, _gauge.value().intValue());
+        assertEquals(0, _gauge.getValue().intValue());
     }
 
     @Test
     public void testValueIncrements() {
         _gauge.add("one");
-        assertEquals(1, _gauge.value().intValue());
+        assertEquals(1, _gauge.getValue().intValue());
         _gauge.add("two");
-        assertEquals(2, _gauge.value().intValue());
+        assertEquals(2, _gauge.getValue().intValue());
     }
 
     @Test
@@ -30,7 +30,7 @@ public class InstanceGaugeTest {
 
         // Add the reference to its reference queue. Normally, this is done by the garbage collector.
         one.enqueue();
-        assertEquals(1, _gauge.value().intValue());
+        assertEquals(1, _gauge.getValue().intValue());
     }
 
     @Test
@@ -41,7 +41,7 @@ public class InstanceGaugeTest {
         // Add the reference to its reference queue. Normally, this is done by the garbage collector.
         one.enqueue();
         two.enqueue();
-        assertEquals(0, _gauge.value().intValue());
+        assertEquals(0, _gauge.getValue().intValue());
     }
     
     @Test
@@ -50,7 +50,7 @@ public class InstanceGaugeTest {
         _gauge.add("two");
 
         _gauge.remove(reference);
-        assertEquals(1, _gauge.value().intValue());
+        assertEquals(1, _gauge.getValue().intValue());
     }
 
     @Test
@@ -60,7 +60,7 @@ public class InstanceGaugeTest {
 
         _gauge.remove(one);
         _gauge.remove(two);
-        assertEquals(0, _gauge.value().intValue());
+        assertEquals(0, _gauge.getValue().intValue());
     }
 
     @Test
@@ -68,7 +68,7 @@ public class InstanceGaugeTest {
         _gauge.add("one");
 
         _gauge.remove(new WeakReference<Object>("two"));
-        assertEquals(1, _gauge.value().intValue());
+        assertEquals(1, _gauge.getValue().intValue());
     }
 
     @Test
@@ -78,6 +78,6 @@ public class InstanceGaugeTest {
 
         _gauge.remove(one);
         _gauge.remove(one);
-        assertEquals(1, _gauge.value().intValue());
+        assertEquals(1, _gauge.getValue().intValue());
     }
 }

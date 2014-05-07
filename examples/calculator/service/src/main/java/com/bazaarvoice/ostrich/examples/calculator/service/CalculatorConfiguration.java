@@ -2,7 +2,7 @@ package com.bazaarvoice.ostrich.examples.calculator.service;
 
 import com.bazaarvoice.curator.dropwizard.ZooKeeperConfiguration;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.yammer.dropwizard.config.Configuration;
+import io.dropwizard.Configuration;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;

@@ -2,8 +2,8 @@ package com.bazaarvoice.ostrich.dropwizard.healthcheck;
 
 import com.bazaarvoice.ostrich.ServicePool;
 import com.bazaarvoice.ostrich.pool.ServicePoolProxies;
+import com.codahale.metrics.health.HealthCheck;
 import com.google.common.base.Strings;
-import com.yammer.metrics.core.HealthCheck;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -17,7 +17,6 @@ public class ContainsValidEndPointCheck extends HealthCheck {
     private final ServicePool<?> _pool;
 
     protected ContainsValidEndPointCheck(ServicePool<?> pool, String name) {
-        super(name);
         checkArgument(!Strings.isNullOrEmpty(name));
         _pool = checkNotNull(pool);
     }

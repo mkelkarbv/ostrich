@@ -5,6 +5,7 @@ import com.bazaarvoice.ostrich.ServiceEndPoint;
 import com.bazaarvoice.ostrich.ServiceEndPointJsonCodec;
 import com.bazaarvoice.ostrich.ServiceRegistry;
 import com.bazaarvoice.ostrich.metrics.Metrics;
+import com.codahale.metrics.Counter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
 import com.google.common.cache.CacheBuilder;
@@ -13,7 +14,6 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Maps;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.utils.ZKPaths;
-import com.yammer.metrics.core.Counter;
 import org.apache.zookeeper.CreateMode;
 
 import java.io.IOException;
@@ -56,12 +56,12 @@ public class ZooKeeperServiceRegistry implements ServiceRegistry
     /** The ephemeral data that's been written to ZooKeeper.  Saved in case the connection is lost and then regained. */
     private final Map<String, PersistentEphemeralNode> _nodes = Maps.newConcurrentMap();
 
-    private final Metrics _metrics = Metrics.forClass(ZooKeeperServiceRegistry.class);
+    private final Metrics.ClassMetrics _metrics = Metrics.forClass(ZooKeeperServiceRegistry.class);
     private final LoadingCache<String, Counter> _numRegisteredEndpoints = CacheBuilder.newBuilder()
             .build(new CacheLoader<String, Counter>() {
                 @Override
-                public Counter load(String scope) throws Exception {
-                    return _metrics.newCounter(scope, "num-registered-end-points");
+                public Counter load(String serviceName) throws Exception {
+                    return _metrics.counter(serviceName, "num-registered-end-points");
                 }
             });
 

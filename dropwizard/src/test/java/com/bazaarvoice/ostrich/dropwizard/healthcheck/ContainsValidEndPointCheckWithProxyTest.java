@@ -2,7 +2,7 @@ package com.bazaarvoice.ostrich.dropwizard.healthcheck;
 
 import com.bazaarvoice.ostrich.ServicePool;
 import com.bazaarvoice.ostrich.pool.ServicePoolProxyHelper;
-import com.yammer.metrics.core.HealthCheck;
+import com.codahale.metrics.health.HealthCheck;
 import org.junit.Before;
 import org.junit.Test;
 

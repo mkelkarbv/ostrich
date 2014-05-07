@@ -1,6 +1,6 @@
 package com.bazaarvoice.ostrich.dropwizard.healthcheck;
 
-import com.yammer.metrics.core.HealthCheck;
+import com.codahale.metrics.health.HealthCheck;
 import org.junit.Test;
 import org.mockito.Mockito;
 

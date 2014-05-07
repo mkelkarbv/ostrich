@@ -5,11 +5,10 @@
     <parent>
         <groupId>com.bazaarvoice.ostrich</groupId>
         <artifactId>ostrich</artifactId>
-        <version>1.7.2-SNAPSHOT</version>
+        <version>1.8.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <groupId>com.bazaarvoice.ostrich</groupId>
     <artifactId>ostrich-core</artifactId>
     <packaging>jar</packaging>
 
@@ -23,7 +22,7 @@
         </dependency>
 
         <dependency>
-            <groupId>com.yammer.metrics</groupId>
+            <groupId>com.codahale.metrics</groupId>
             <artifactId>metrics-core</artifactId>
         </dependency>
 

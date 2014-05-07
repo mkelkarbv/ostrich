@@ -9,20 +9,24 @@ import com.bazaarvoice.ostrich.pool.ServiceCachingPolicyBuilder;
 import com.bazaarvoice.ostrich.pool.ServicePoolBuilder;
 import com.bazaarvoice.ostrich.pool.ServicePoolProxies;
 import com.bazaarvoice.ostrich.retry.ExponentialBackoffRetry;
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.health.HealthCheckRegistry;
 import com.google.common.io.Closeables;
-import org.apache.curator.framework.CuratorFramework;
-import com.yammer.dropwizard.config.ConfigurationException;
-import com.yammer.dropwizard.config.ConfigurationFactory;
-import com.yammer.dropwizard.util.JarLocation;
-import com.yammer.dropwizard.validation.Validator;
-import com.yammer.metrics.HealthChecks;
+import io.dropwizard.client.JerseyClientConfiguration;
+import io.dropwizard.configuration.ConfigurationException;
+import io.dropwizard.configuration.ConfigurationFactory;
+import io.dropwizard.jackson.Jackson;
+import io.dropwizard.util.JarLocation;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
+import org.apache.curator.framework.CuratorFramework;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.validation.Validation;
+import javax.validation.Validator;
 import java.io.File;
 import java.io.IOException;
 import java.util.Random;
@@ -85,7 +89,9 @@ public class CalculatorProxyUser {
                 .withMaxServiceInstanceIdleTime(5, TimeUnit.MINUTES)
                 .build();
 
-        CalculatorServiceFactory serviceFactory = new CalculatorServiceFactory(config.getHttpClientConfiguration());
+        JerseyClientConfiguration httpClientConfiguration = config.getHttpClientConfiguration();
+        MetricRegistry metrics = new MetricRegistry();
+        CalculatorServiceFactory serviceFactory = new CalculatorServiceFactory(httpClientConfiguration, metrics);
         CalculatorService service = ServicePoolBuilder.create(CalculatorService.class)
                 .withServiceFactory(serviceFactory)
                 .withHostDiscovery(new ZooKeeperHostDiscovery(curator, serviceFactory.getServiceName()))
@@ -95,7 +101,8 @@ public class CalculatorProxyUser {
         // If using Yammer Metrics or running in Dropwizard (which includes Yammer Metrics), you may want a health
         // check that pings a service you depend on. This will register a simple check that will confirm the service
         // pool contains at least one healthy end point.
-        HealthChecks.register(ContainsHealthyEndPointCheck.forProxy(service, "calculator-user"));
+        HealthCheckRegistry healthChecks = new HealthCheckRegistry();
+        healthChecks.register("calculator-user", ContainsHealthyEndPointCheck.forProxy(service));
 
         CalculatorProxyUser user = new CalculatorProxyUser(service);
         user.use();
@@ -111,10 +118,12 @@ public class CalculatorProxyUser {
         return argParser.parseArgs(args);
     }
 
-    private static CalculatorConfiguration loadConfigFile(String configFile)
-            throws IOException, ConfigurationException {
-        ConfigurationFactory<CalculatorConfiguration> configFactory = ConfigurationFactory
-                .forClass(CalculatorConfiguration.class, new Validator());
+    private static CalculatorConfiguration loadConfigFile(String configFile) throws IOException,
+            ConfigurationException {
+        Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+        ConfigurationFactory<CalculatorConfiguration> configFactory = new ConfigurationFactory<CalculatorConfiguration>(
+                CalculatorConfiguration.class, validator, Jackson.newObjectMapper(), "calculator"
+        );
         if (configFile != null) {
             return configFactory.build(new File(configFile));
         } else {

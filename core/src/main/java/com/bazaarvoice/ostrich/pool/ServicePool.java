@@ -19,6 +19,9 @@ import com.bazaarvoice.ostrich.exceptions.OnlyBadHostsException;
 import com.bazaarvoice.ostrich.healthcheck.DefaultHealthCheckResults;
 import com.bazaarvoice.ostrich.metrics.Metrics;
 import com.bazaarvoice.ostrich.partition.PartitionFilter;
+import com.codahale.metrics.Gauge;
+import com.codahale.metrics.Meter;
+import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.base.Predicate;
@@ -31,10 +34,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.yammer.metrics.core.Gauge;
-import com.yammer.metrics.core.Meter;
-import com.yammer.metrics.core.Timer;
-import com.yammer.metrics.core.TimerContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,7 +67,7 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
     private final Set<ServiceEndPoint> _recentlyRemovedEndPoints;
     private final Future<?> _batchHealthChecksFuture;
     private final ServiceCache<S> _serviceCache;
-    private final Metrics _metrics;
+    private final Metrics.InstanceMetrics _metrics;
     private final Timer _callbackExecutionTime;
     private final Timer _healthCheckTime;
     private final Meter _numExecuteSuccesses;
@@ -134,23 +133,20 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
         _batchHealthChecksFuture = _healthCheckExecutor.scheduleAtFixedRate(new BatchHealthChecks(),
                 HEALTH_CHECK_POLL_INTERVAL_IN_SECONDS, HEALTH_CHECK_POLL_INTERVAL_IN_SECONDS, TimeUnit.SECONDS);
 
-        String serviceName = _serviceFactory.getServiceName();
-        _metrics = Metrics.forInstance(this, serviceName);
-        _callbackExecutionTime = _metrics.newTimer(serviceName, "callback-execution-time", TimeUnit.MILLISECONDS,
-                TimeUnit.SECONDS);
-        _healthCheckTime = _metrics.newTimer(serviceName, "health-check-time", TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
-        _numExecuteSuccesses = _metrics.newMeter(serviceName, "num-execute-successes", "successes", TimeUnit.SECONDS);
-        _numExecuteAttemptFailures = _metrics.newMeter(serviceName, "num-execute-attempt-failures", "failures",
-                TimeUnit.SECONDS);
-        _metrics.newGauge(serviceName, "num-valid-end-points", new Gauge<Integer>() {
+        _metrics = Metrics.forInstance(this, _serviceFactory.getServiceName());
+        _callbackExecutionTime = _metrics.timer("callback-execution-time");
+        _healthCheckTime = _metrics.timer("health-check-time");
+        _numExecuteSuccesses = _metrics.meter("num-execute-successes");
+        _numExecuteAttemptFailures = _metrics.meter("num-execute-attempt-failures");
+        _metrics.gauge("num-valid-end-points", new Gauge<Integer>() {
             @Override
-            public Integer value() {
+            public Integer getValue() {
                 return getNumValidEndPoints();
             }
         });
-        _metrics.newGauge(serviceName, "num-bad-end-points", new Gauge<Integer>() {
+        _metrics.gauge("num-bad-end-points", new Gauge<Integer>() {
             @Override
-            public Integer value() {
+            public Integer getValue() {
                 return getNumBadEndPoints();
             }
         });
@@ -169,6 +165,7 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
             }
         }
 
+        _serviceCache.close();
         _metrics.close();
 
         if (_shutdownHealthCheckExecutorOnClose) {
@@ -183,7 +180,7 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
 
     @Override
     public <R> R execute(PartitionContext partitionContext, RetryPolicy retry, ServiceCallback<S, R> callback) {
-        Stopwatch sw = new Stopwatch(_ticker).start();
+        Stopwatch sw = Stopwatch.createStarted(_ticker);
         int numAttempts = 0;
         Exception lastException = null;
 
@@ -282,7 +279,7 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
         try {
             handle = _serviceCache.checkOut(endPoint);
 
-            TimerContext timer = _callbackExecutionTime.time();
+            Timer.Context timer = _callbackExecutionTime.time();
             try {
                 return callback.call(handle.getService());
             } finally {
@@ -439,7 +436,7 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
         // We have to be very careful to not allow any exceptions to make it out of of this method, if they do then
         // subsequent scheduled invocations of the Runnable may not happen, and we could stop checking health checks
         // completely.  So we intentionally handle all possible exceptions here.
-        Stopwatch sw = new Stopwatch(_ticker).start();
+        Stopwatch sw = Stopwatch.createStarted(_ticker);
 
         try {
             return  _serviceFactory.isHealthy(endPoint)

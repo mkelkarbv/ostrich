@@ -1,14 +1,10 @@
 package com.bazaarvoice.ostrich.examples.dictionary.service;
 
-import com.yammer.metrics.core.HealthCheck;
+import com.codahale.metrics.health.HealthCheck;
 
 import javax.ws.rs.core.Response;
 
 public class DictionaryHealthCheck extends HealthCheck {
-    protected DictionaryHealthCheck() {
-        super("dictionary");
-    }
-
     @Override
     protected Result check() throws Exception {
         if (DictionaryService.STATUS_OVERRIDE == Response.Status.OK) {

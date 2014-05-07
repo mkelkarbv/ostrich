@@ -8,14 +8,13 @@ import com.bazaarvoice.ostrich.ServiceEndPointPredicate;
 import com.bazaarvoice.ostrich.exceptions.MaxRetriesException;
 import com.bazaarvoice.ostrich.exceptions.NoAvailableHostsException;
 import com.bazaarvoice.ostrich.metrics.Metrics;
+import com.codahale.metrics.Histogram;
+import com.codahale.metrics.Meter;
+import com.codahale.metrics.Timer;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Ticker;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.yammer.metrics.core.Histogram;
-import com.yammer.metrics.core.Meter;
-import com.yammer.metrics.core.Timer;
-import com.yammer.metrics.core.TimerContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,7 +23,6 @@ import java.util.Collection;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -43,7 +41,7 @@ class AsyncServicePool<S> implements com.bazaarvoice.ostrich.AsyncServicePool<S>
     private final boolean _shutdownPoolOnClose;
     private final ExecutorService _executor;
     private final boolean _shutdownExecutorOnClose;
-    private final Metrics _metrics;
+    private final Metrics.InstanceMetrics _metrics;
     private final Timer _executionTime;
     private final Meter _numExecuteSuccesses;
     private final Meter _numExecuteFailures;
@@ -57,12 +55,11 @@ class AsyncServicePool<S> implements com.bazaarvoice.ostrich.AsyncServicePool<S>
         _executor = checkNotNull(executor);
         _shutdownExecutorOnClose = shutdownExecutorOnClose;
 
-        String serviceName = _pool.getServiceName();
-        _metrics = Metrics.forInstance(this, serviceName);
-        _executionTime = _metrics.newTimer(serviceName, "execution-time", TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
-        _numExecuteSuccesses = _metrics.newMeter(serviceName, "num-execute-successes", "successes", TimeUnit.SECONDS);
-        _numExecuteFailures = _metrics.newMeter(serviceName, "num-execute-failures", "failures", TimeUnit.SECONDS);
-        _executeBatchSize = _metrics.newHistogram(serviceName, "execute-batch-size", false);
+        _metrics = Metrics.forInstance(this, _pool.getServiceName());
+        _executionTime = _metrics.timer("execution-time");
+        _numExecuteSuccesses = _metrics.meter("num-execute-successes");
+        _numExecuteFailures = _metrics.meter("num-execute-failures");
+        _executeBatchSize = _metrics.histogram("execute-batch-size");
     }
 
     @Override
@@ -122,8 +119,8 @@ class AsyncServicePool<S> implements com.bazaarvoice.ostrich.AsyncServicePool<S>
             Future<R> future = _executor.submit(new Callable<R>() {
                 @Override
                 public R call() throws Exception {
-                    TimerContext timer = _executionTime.time();
-                    Stopwatch sw = new Stopwatch(_ticker).start();
+                    Timer.Context timer = _executionTime.time();
+                    Stopwatch sw = Stopwatch.createStarted(_ticker);
                     int numAttempts = 0;
 
                     try {

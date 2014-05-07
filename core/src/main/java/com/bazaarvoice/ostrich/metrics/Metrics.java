@@ -1,21 +1,20 @@
 package com.bazaarvoice.ostrich.metrics;
 
+import com.codahale.metrics.Counter;
+import com.codahale.metrics.Gauge;
+import com.codahale.metrics.Histogram;
+import com.codahale.metrics.Meter;
+import com.codahale.metrics.Metric;
+import com.codahale.metrics.MetricFilter;
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Objects;
 import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
-import com.yammer.metrics.core.Counter;
-import com.yammer.metrics.core.Gauge;
-import com.yammer.metrics.core.Histogram;
-import com.yammer.metrics.core.Meter;
-import com.yammer.metrics.core.MetricName;
-import com.yammer.metrics.core.MetricsRegistry;
-import com.yammer.metrics.core.Timer;
+import com.google.common.collect.Sets;
 
 import java.io.Closeable;
-import java.lang.ref.Reference;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.Map;
+import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -23,118 +22,188 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * A thin wrapper implementation around Yammer Metrics for use by SOA.  This wrapper adds the following functionality:
  * <p/>
- * The ability to control what {@link MetricsRegistry} instance is used for SOA metrics via
- * {@link #setMetricsRegistry(MetricsRegistry)}.  This gives us the ability in the future to isolate the SOA metrics
+ * The ability to control what {@link MetricRegistry} instance is used for SOA metrics via
+ * {@link #setMetricRegistry(MetricRegistry)}.  This gives us the ability in the future to isolate the SOA metrics
  * from the end user's application metrics as well as publish them somewhere differently from the end user's application
  * metrics.
  */
-public class Metrics implements Closeable {
-    private static MetricsRegistry DEFAULT_METRICS_REGISTRY = com.yammer.metrics.Metrics.defaultRegistry();
+public abstract class Metrics implements Closeable {
+    private static MetricRegistry METRICS_REGISTRY = new MetricRegistry();
 
-    private InstanceGauge _instanceGauge = new InstanceGauge();
-    private String _instanceScope = null;
-    private final List<Reference<?>> _instanceReferences = Lists.newLinkedList();
-    private final List<MetricName> _registeredMetrics = Lists.newLinkedList();
-
-    /** Set the metrics registry that should be used by the SOA library for creating and registering metrics. */
-    public static void setMetricsRegistry(MetricsRegistry registry) {
-        DEFAULT_METRICS_REGISTRY = checkNotNull(registry);
+    /** Set the metric registry that should be used by the SOA library for creating and registering metrics. */
+    public static void setMetricRegistry(MetricRegistry registry) {
+        METRICS_REGISTRY = checkNotNull(registry);
     }
 
-    private final MetricsRegistry _registry;
-    private final Class<?> _domain;
-
-    public static Metrics forClass(Class<?> owner) {
-        return new Metrics(DEFAULT_METRICS_REGISTRY, owner);
+    /** Return the metric registry that is currently being used. */
+    public static MetricRegistry getMetricsRegistry() {
+        return METRICS_REGISTRY;
     }
 
-    public static Metrics forInstance(Object instance, String instanceScope) {
-        checkNotNull(instance);
-        Metrics metrics = forClass(instance.getClass());
-        metrics.addInstance(instance, instanceScope);
-        return metrics;
+    /**
+     * Create a metrics instance that corresponds to a class.  This is useful for cases where a single instance handles
+     * many different services at the same time.  For example a ServiceRegistry.
+     */
+    public static ClassMetrics forClass(Class<?> cls) {
+        return new ClassMetrics(cls);
     }
 
-    private Metrics(MetricsRegistry registry, Class<?> owner) {
-        checkNotNull(owner);
-        checkNotNull(registry);
-
-        _registry = registry;
-        _domain = owner;
+    /**
+     * Create a metrics instance that corresponds to a single instance of a class.  This is useful for cases where there
+     * exists one instance per service.  For example in a ServicePool.
+     */
+    public static InstanceMetrics forInstance(Object instance, String serviceName) {
+        return new InstanceMetrics(instance, serviceName);
     }
 
-    public void close() {
-        for (Reference<?> reference : _instanceReferences) {
-            _instanceGauge.remove(reference);
+    public static final class ClassMetrics implements Closeable {
+        private final MetricRegistry _metrics = METRICS_REGISTRY;
+        private final Class<?> _class;
+        private final String _prefix;
+        private final Set<String> _names = Sets.newHashSet();
+
+        ClassMetrics(Class<?> cls) {
+            _class = checkNotNull(cls);
+            _prefix = MetricRegistry.name(_class);
         }
-        for (MetricName metricName : _registeredMetrics) {
-            // Don't unregister if we have other instances with the same scope.
-            if (_instanceGauge.value() == 0 || !Objects.equal(_instanceScope, metricName.getScope())) {
-                _registry.removeMetric(metricName);
+
+        public <T> Gauge<T> gauge(String serviceName, String name, Gauge<T> metric) {
+            checkNotNullOrEmpty(serviceName);
+            checkNotNullOrEmpty(name);
+            checkNotNull(metric);
+            return _metrics.register(name(serviceName, name), metric);
+        }
+
+        public Counter counter(String serviceName, String name) {
+            checkNotNullOrEmpty(serviceName);
+            checkNotNullOrEmpty(name);
+            return _metrics.counter(name(serviceName, name));
+        }
+
+        public Histogram histogram(String serviceName, String name) {
+            checkNotNullOrEmpty(serviceName);
+            checkNotNullOrEmpty(name);
+            return _metrics.histogram(name(serviceName, name));
+        }
+
+        public Meter meter(String serviceName, String name) {
+            checkNotNullOrEmpty(serviceName);
+            checkNotNullOrEmpty(name);
+            return _metrics.meter(name(serviceName, name));
+        }
+
+        public Timer timer(String serviceName, String name) {
+            checkNotNullOrEmpty(serviceName);
+            checkNotNullOrEmpty(name);
+            return _metrics.timer(name(serviceName, name));
+        }
+
+        @Override
+        public void close() {
+            _metrics.removeMatching(new MetricFilter() {
+                @Override
+                public boolean matches(String name, Metric metric) {
+                    return _names.contains(name);
+                }
+            });
+            _names.clear();
+        }
+
+        @VisibleForTesting
+        String name(String serviceName, String name) {
+            String fullName = MetricRegistry.name(_prefix, serviceName, name);
+            _names.add(fullName);
+            return fullName;
+        }
+    }
+
+    public static class InstanceMetrics implements Closeable {
+        private final MetricRegistry _registry = METRICS_REGISTRY;
+        private final Map<String, Metric> _metrics = _registry.getMetrics();
+        private final Object _instance;
+        private final String _serviceName;
+        private final String _prefix;
+
+        private final String _instanceCounterName;
+        private final Counter _instanceCounter;
+        private final Set<String> _names = Sets.newHashSet();
+
+        InstanceMetrics(Object instance, String serviceName) {
+            _instance = checkNotNull(instance);
+            _serviceName = checkNotNullOrEmpty(serviceName);
+            _prefix = MetricRegistry.name(_instance.getClass());
+            _instanceCounterName = name("num-instances");
+            _instanceCounter = counter("num-instances");
+            _instanceCounter.inc();
+        }
+
+        @SuppressWarnings("unchecked")
+        public <T> Gauge<T> gauge(String name, Gauge<T> gauge) {
+            checkNotNullOrEmpty(name);
+            checkNotNull(gauge);
+
+            // Unfortunately register doesn't call getOrAdd (probably a bug in metrics), and instead goes through
+            // a code path that throws an exception if this metric already exists.
+            String fullName = name(name);
+            Gauge<T> metric = (Gauge<T>) _metrics.get(fullName);
+            if (metric == null) {
+                metric = _registry.register(fullName, gauge);
             }
+
+            return metric;
+        }
+
+        public Counter counter(String name) {
+            checkNotNullOrEmpty(name);
+            return _registry.counter(name(name));
+        }
+
+        public Histogram histogram(String name) {
+            checkNotNullOrEmpty(name);
+            return _registry.histogram(name(name));
+        }
+
+        public Meter meter(String name) {
+            checkNotNullOrEmpty(name);
+            return _registry.meter(name(name));
+        }
+
+        public Timer timer(String name) {
+            checkNotNullOrEmpty(name);
+            return _registry.timer(name(name));
+        }
+
+        @VisibleForTesting
+        Counter getInstanceCounter() {
+            return _instanceCounter;
+        }
+
+        @VisibleForTesting
+        String name(String name) {
+            String fullName = MetricRegistry.name(_prefix, _serviceName, name);
+            _names.add(fullName);
+            return fullName;
+        }
+
+        @Override
+        public void close() {
+            _instanceCounter.dec();
+            _registry.removeMatching(new MetricFilter() {
+                @Override
+                public boolean matches(String name, Metric metric) {
+                    if (name.equals(_instanceCounterName) && _instanceCounter.getCount() != 0) {
+                        return false;
+                    }
+                    return _names.contains(name);
+                }
+            });
+            _names.clear();
         }
     }
 
-    /** @see MetricsRegistry#newGauge(MetricName, Gauge) */
-    public <T> Gauge<T> newGauge(String scope, String name, Gauge<T> metric) {
-        checkNotNull(metric);
-        return _registry.newGauge(newRegisteredName(scope, name), metric);
-    }
-
-    /** @see MetricsRegistry#newCounter(com.yammer.metrics.core.MetricName) */
-    public Counter newCounter(String scope, String name) {
-        return _registry.newCounter(newRegisteredName(scope, name));
-    }
-
-    /** @see MetricsRegistry#newHistogram(MetricName, boolean) */
-    public Histogram newHistogram(String scope, String name, boolean biased) {
-        return _registry.newHistogram(newRegisteredName(scope, name), biased);
-    }
-
-    /** @see MetricsRegistry#newMeter(MetricName, String, TimeUnit) */
-    public Meter newMeter(String scope, String name, String eventType, TimeUnit unit) {
-        checkNotNullOrEmpty(eventType);
-        checkNotNull(unit);
-        return _registry.newMeter(newRegisteredName(scope, name), eventType, unit);
-    }
-
-    /** @see MetricsRegistry#newTimer(MetricName, TimeUnit, TimeUnit) */
-    public Timer newTimer(String scope, String name, TimeUnit durationUnit, TimeUnit rateUnit) {
-        checkNotNull(durationUnit);
-        checkNotNull(rateUnit);
-        return _registry.newTimer(newRegisteredName(scope, name), durationUnit, rateUnit);
-    }
-
-    @VisibleForTesting
-    InstanceGauge addInstance(Object instance, String scope) {
-        // Use an existing instance gauge if there is one registered already.
-        _instanceGauge = (InstanceGauge) _registry.newGauge(newRegisteredName(scope, "num-instances"), _instanceGauge);
-        _instanceReferences.add(_instanceGauge.add(instance));
-        _instanceScope = scope;
-        return _instanceGauge;
-    }
-
-    @VisibleForTesting
-    MetricName newName(String scope, String name) {
-        return new MetricName(_domain, name, scope);
-    }
-
-    private MetricName newRegisteredName(String scope, String name) {
-        checkNotNullOrEmpty(scope);
-        checkNotNullOrEmpty(name);
-
-        MetricName metricName = newName(scope, name);
-        _registeredMetrics.add(metricName);
-        return metricName;
-    }
-
-    @VisibleForTesting
-    MetricsRegistry getRegistry() {
-        return _registry;
-    }
-
-    private static void checkNotNullOrEmpty(String string) {
+    private static String checkNotNullOrEmpty(String string) {
         checkNotNull(string);
         checkArgument(!Strings.isNullOrEmpty(string));
+        return string;
     }
 }

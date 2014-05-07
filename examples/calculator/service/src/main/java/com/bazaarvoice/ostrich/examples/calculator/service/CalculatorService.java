@@ -2,43 +2,54 @@ package com.bazaarvoice.ostrich.examples.calculator.service;
 
 import com.bazaarvoice.ostrich.ServiceEndPoint;
 import com.bazaarvoice.ostrich.ServiceEndPointBuilder;
+import com.bazaarvoice.ostrich.metrics.Metrics;
 import com.bazaarvoice.ostrich.registry.zookeeper.ZooKeeperServiceRegistry;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
+import io.dropwizard.Application;
+import io.dropwizard.Configuration;
+import io.dropwizard.jetty.ConnectorFactory;
+import io.dropwizard.jetty.HttpConnectorFactory;
+import io.dropwizard.lifecycle.Managed;
+import io.dropwizard.server.DefaultServerFactory;
+import io.dropwizard.server.ServerFactory;
+import io.dropwizard.setup.Bootstrap;
+import io.dropwizard.setup.Environment;
 import org.apache.curator.framework.CuratorFramework;
-import com.yammer.dropwizard.Service;
-import com.yammer.dropwizard.config.Bootstrap;
-import com.yammer.dropwizard.config.Environment;
-import com.yammer.dropwizard.lifecycle.Managed;
 
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriBuilder;
 import java.net.InetAddress;
 import java.net.URI;
+import java.util.List;
 import java.util.Map;
 
 /**
  * A Dropwizard+Jersey-based client of a simple calculator service.
  */
-public class CalculatorService extends Service<CalculatorConfiguration> {
+public class CalculatorService extends Application<CalculatorConfiguration> {
     public static Response.Status STATUS_OVERRIDE = Response.Status.OK;
 
     @Override
+    public String getName() {
+        return "calculator";
+    }
+
+    @Override
     public void initialize(Bootstrap<CalculatorConfiguration> bootstrap) {
-        bootstrap.setName("calculator");
+        Metrics.setMetricRegistry(bootstrap.getMetricRegistry());
     }
 
     @Override
     public void run(CalculatorConfiguration config, Environment env) throws Exception {
-        env.addResource(CalculatorResource.class);
-        env.addResource(ToggleHealthResource.class);
-        env.addHealthCheck(new CalculatorHealthCheck());
+        env.jersey().register(CalculatorResource.class);
+        env.jersey().register(ToggleHealthResource.class);
+        env.healthChecks().register("calculator", new CalculatorHealthCheck());
 
         InetAddress localhost = InetAddress.getLocalHost();
         String host = localhost.getHostName();
         String ip = localhost.getHostAddress();
-        int port = config.getHttpConfiguration().getPort();
-        int adminPort = config.getHttpConfiguration().getAdminPort();
+        int port = getHttpPort(config);
+        int adminPort = getAdminHttpPort(config);
 
         // The client reads the URLs out of the payload to figure out how to connect to this server.
         URI serviceUri = UriBuilder.fromResource(CalculatorResource.class).scheme("http").host(ip).port(port).build();
@@ -49,11 +60,11 @@ public class CalculatorService extends Service<CalculatorConfiguration> {
         final ServiceEndPoint endPoint = new ServiceEndPointBuilder()
                 .withServiceName(env.getName())
                 .withId(host + ":" + port)
-                .withPayload(getJson(env).writeValueAsString(payload))
+                .withPayload(env.getObjectMapper().writeValueAsString(payload))
                 .build();
 
-        final CuratorFramework curator = config.getZooKeeperConfiguration().newManagedCurator(env);
-        env.manage(new Managed() {
+        final CuratorFramework curator = config.getZooKeeperConfiguration().newManagedCurator(env.lifecycle());
+        env.lifecycle().manage(new Managed() {
             ZooKeeperServiceRegistry registry = new ZooKeeperServiceRegistry(curator);
 
             @Override
@@ -68,8 +79,36 @@ public class CalculatorService extends Service<CalculatorConfiguration> {
         });
     }
 
-    private ObjectMapper getJson(Environment env) {
-        return env.getObjectMapperFactory().build();
+    private int getHttpPort(Configuration config) {
+        ServerFactory serverFactory = config.getServerFactory();
+        if (!(serverFactory instanceof DefaultServerFactory)) {
+            throw new IllegalStateException("Server factory is not an instance of DefaultServerFactory");
+        }
+
+        List<ConnectorFactory> connectors = ((DefaultServerFactory) serverFactory).getApplicationConnectors();
+        for (ConnectorFactory connector : connectors) {
+            if (connector instanceof HttpConnectorFactory) {
+                return ((HttpConnectorFactory) connector).getPort();
+            }
+        }
+
+        throw new IllegalStateException("Unable to determine HTTP port");
+    }
+
+    private int getAdminHttpPort(Configuration config) {
+        ServerFactory serverFactory = config.getServerFactory();
+        if (!(serverFactory instanceof DefaultServerFactory)) {
+            throw new IllegalStateException("Server factory is not an instance of DefaultServerFactory");
+        }
+
+        List<ConnectorFactory> connectors = ((DefaultServerFactory) serverFactory).getAdminConnectors();
+        for (ConnectorFactory connector : connectors) {
+            if (connector instanceof HttpConnectorFactory) {
+                return ((HttpConnectorFactory) connector).getPort();
+            }
+        }
+
+        throw new IllegalStateException("Unable to determine admin HTTP port");
     }
 
     public static void main(String[] args) throws Exception {

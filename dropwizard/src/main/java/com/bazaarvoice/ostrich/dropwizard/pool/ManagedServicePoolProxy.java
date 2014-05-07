@@ -3,7 +3,7 @@ package com.bazaarvoice.ostrich.dropwizard.pool;
 import com.bazaarvoice.ostrich.RetryPolicy;
 import com.bazaarvoice.ostrich.pool.ServicePoolBuilder;
 import com.bazaarvoice.ostrich.pool.ServicePoolProxies;
-import com.yammer.dropwizard.lifecycle.Managed;
+import io.dropwizard.lifecycle.Managed;
 
 import static com.google.common.base.Preconditions.checkArgument;
 

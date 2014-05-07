@@ -147,7 +147,7 @@ public class AnnotationPartitionContextSupplierTest {
         void noKey(boolean flag);
         void twoArgsOneKey(int num, String string);
         void threeKey(String a1, String a2, String a3);
-        List covariant(String string);
+        List<?> covariant(String string);
     }
 
     private static interface MyExtendedService extends MyService {
@@ -172,7 +172,7 @@ public class AnnotationPartitionContextSupplierTest {
         @Override
         public void threeKey(@PartitionKey String x, @PartitionKey ("b") String y, @PartitionKey ("c") String z) {}
         @Override
-        public ArrayList covariant(@PartitionKey String string) {return null;}
+        public ArrayList<?> covariant(@PartitionKey String string) {return null;}
     }
 
     private static class MyExtendedServiceImpl extends MyServiceImpl implements MyExtendedService {

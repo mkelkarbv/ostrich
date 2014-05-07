@@ -45,7 +45,7 @@ public class ZooKeeperHostDiscoveryTest {
         ZooKeeperHostDiscovery.NodeDiscoveryFactory factory = mock(ZooKeeperHostDiscovery.NodeDiscoveryFactory.class);
         NodeDiscovery<ServiceEndPoint> nodeDiscovery = mock(NodeDiscovery.class);
         CuratorFramework curator = mock(CuratorFramework.class);
-        when(factory.create(Matchers.<CuratorFramework>any(CuratorFramework.class), anyString(),
+        when(factory.create(Matchers.any(CuratorFramework.class), anyString(),
                 Matchers.<NodeDiscovery.NodeDataParser<ServiceEndPoint>>any())).thenReturn(nodeDiscovery);
 
         _discovery = new ZooKeeperHostDiscovery(factory, curator, FOO.getServiceName());

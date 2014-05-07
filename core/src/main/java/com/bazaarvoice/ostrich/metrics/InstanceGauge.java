@@ -1,20 +1,20 @@
 package com.bazaarvoice.ostrich.metrics;
 
+import com.codahale.metrics.Gauge;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.yammer.metrics.core.Gauge;
 
 import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.util.Set;
 
-class InstanceGauge extends Gauge<Integer> {
+class InstanceGauge implements Gauge<Integer> {
     private final Set<Reference<?>> _instances = Sets.newSetFromMap(Maps.<Reference<?>, Boolean>newConcurrentMap());
     private final ReferenceQueue<Object> _referenceQueue = new ReferenceQueue<Object>();
 
     @Override
-    public Integer value() {
+    public Integer getValue() {
         cleanup();
         return _instances.size();
     }
