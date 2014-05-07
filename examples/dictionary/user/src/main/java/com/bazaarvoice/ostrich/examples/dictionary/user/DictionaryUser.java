@@ -126,7 +126,7 @@ public class DictionaryUser {
         }
 
         ServicePoolProxies.close(service);
-        Closeables.closeQuietly(curator);
+        Closeables.close(curator, true);
     }
 
     private static Namespace parseCommandLine(String[] args) throws ArgumentParserException {
