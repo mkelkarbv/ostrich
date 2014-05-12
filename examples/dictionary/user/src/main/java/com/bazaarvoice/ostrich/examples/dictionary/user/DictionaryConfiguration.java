@@ -2,7 +2,7 @@ package com.bazaarvoice.ostrich.examples.dictionary.user;
 
 import com.bazaarvoice.curator.dropwizard.ZooKeeperConfiguration;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.yammer.dropwizard.client.JerseyClientConfiguration;
+import io.dropwizard.client.JerseyClientConfiguration;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;

@@ -1,7 +1,7 @@
 package com.bazaarvoice.ostrich.examples.dictionary.service;
 
 import com.bazaarvoice.ostrich.examples.dictionary.client.WordRange;
-import com.yammer.metrics.annotation.Timed;
+import com.codahale.metrics.annotation.Timed;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -33,8 +33,8 @@ public class DictionaryResource {
         _range = range;
     }
 
-    @GET
     @Timed
+    @GET
     @Path("/contains/{word}")
     public boolean contains(@PathParam("word") String word) {
         checkHealthy();

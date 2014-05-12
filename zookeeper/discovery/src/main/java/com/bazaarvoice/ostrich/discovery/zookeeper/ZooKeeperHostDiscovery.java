@@ -5,6 +5,9 @@ import com.bazaarvoice.ostrich.HostDiscovery;
 import com.bazaarvoice.ostrich.ServiceEndPoint;
 import com.bazaarvoice.ostrich.ServiceEndPointJsonCodec;
 import com.bazaarvoice.ostrich.metrics.Metrics;
+import com.codahale.metrics.Counter;
+import com.codahale.metrics.Gauge;
+import com.codahale.metrics.Meter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ConcurrentHashMultiset;
@@ -14,15 +17,11 @@ import com.google.common.collect.Multiset;
 import com.google.common.collect.Sets;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.utils.ZKPaths;
-import com.yammer.metrics.core.Counter;
-import com.yammer.metrics.core.Gauge;
-import com.yammer.metrics.core.Meter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -48,7 +47,7 @@ public class ZooKeeperHostDiscovery implements HostDiscovery {
     private final Multiset<ServiceEndPoint> _endPoints;
     private final Set<EndPointListener> _listeners;
 
-    private final Metrics _metrics;
+    private final Metrics.InstanceMetrics _metrics;
     private final Counter _numListeners;
     private final Meter _numZooKeeperAdds;
     private final Meter _numZooKeeperRemoves;
@@ -84,17 +83,17 @@ public class ZooKeeperHostDiscovery implements HostDiscovery {
         _nodeDiscovery.addListener(new ServiceListener());
 
         _metrics = Metrics.forInstance(this, serviceName);
-        _metrics.newGauge(serviceName, "num-end-points", new Gauge<Integer>() {
+        _metrics.gauge("num-end-points", new Gauge<Integer>() {
             @Override
-            public Integer value() {
+            public Integer getValue() {
                 return Iterables.size(getHosts());
             }
         });
 
-        _numListeners = _metrics.newCounter(serviceName, "num-listeners");
-        _numZooKeeperAdds = _metrics.newMeter(serviceName, "num-zookeeper-adds", "adds", TimeUnit.MINUTES);
-        _numZooKeeperRemoves = _metrics.newMeter(serviceName, "num-zookeeper-removes", "removes", TimeUnit.MINUTES);
-        _numZooKeeperChanges = _metrics.newMeter(serviceName, "num-zookeeper-changes", "changes", TimeUnit.MINUTES);
+        _numListeners = _metrics.counter("num-listeners");
+        _numZooKeeperAdds = _metrics.meter("num-zookeeper-adds");
+        _numZooKeeperRemoves = _metrics.meter("num-zookeeper-removes");
+        _numZooKeeperChanges = _metrics.meter("num-zookeeper-changes");
 
         // wait to start node discovery until all fields are initialized.
         _nodeDiscovery.start();
@@ -124,14 +123,16 @@ public class ZooKeeperHostDiscovery implements HostDiscovery {
         _metrics.close();
     }
 
-    private void addServiceEndPoint(ServiceEndPoint serviceEndPoint) {
+    @VisibleForTesting
+    void addServiceEndPoint(ServiceEndPoint serviceEndPoint) {
         // add returns the number of instances that were in the Multiset before the add.
         if (_endPoints.add(serviceEndPoint, 1) == 0) {
             fireAddEvent(serviceEndPoint);
         }
     }
 
-    private void removeServiceEndPoint(ServiceEndPoint serviceEndPoint) {
+    @VisibleForTesting
+    void removeServiceEndPoint(ServiceEndPoint serviceEndPoint) {
         // remove returns the number of instances that were in the Multiset before the remove.
         if (_endPoints.remove(serviceEndPoint, 1) == 1) {
             fireRemoveEvent(serviceEndPoint);

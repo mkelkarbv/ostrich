@@ -3,9 +3,9 @@ package com.bazaarvoice.ostrich.dropwizard.healthcheck;
 import com.bazaarvoice.ostrich.HealthCheckResult;
 import com.bazaarvoice.ostrich.HealthCheckResults;
 import com.bazaarvoice.ostrich.ServicePool;
+import com.codahale.metrics.health.HealthCheck;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import com.yammer.metrics.core.HealthCheck;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
@@ -50,22 +50,12 @@ public class ContainsHealthyEndPointCheckTest {
             }
         });
 
-        _check = ContainsHealthyEndPointCheck.forPool(_pool, "test");
+        _check = ContainsHealthyEndPointCheck.forPool(_pool);
     }
 
     @Test(expected = NullPointerException.class)
     public void testNullPool() {
-        ContainsHealthyEndPointCheck.forPool(null, "test");
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testNullServiceName() {
-        ContainsHealthyEndPointCheck.forPool(_pool, null);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testEmptyServiceName() {
-        ContainsHealthyEndPointCheck.forPool(_pool, "");
+        ContainsHealthyEndPointCheck.forPool(null);
     }
 
     @Test

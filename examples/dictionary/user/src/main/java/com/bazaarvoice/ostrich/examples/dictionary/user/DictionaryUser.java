@@ -9,25 +9,29 @@ import com.bazaarvoice.ostrich.pool.ServiceCachingPolicyBuilder;
 import com.bazaarvoice.ostrich.pool.ServicePoolBuilder;
 import com.bazaarvoice.ostrich.pool.ServicePoolProxies;
 import com.bazaarvoice.ostrich.retry.ExponentialBackoffRetry;
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.health.HealthCheckRegistry;
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Charsets;
 import com.google.common.base.Splitter;
 import com.google.common.io.Closeables;
 import com.google.common.io.Files;
 import com.google.common.io.LineProcessor;
-import org.apache.curator.framework.CuratorFramework;
-import com.yammer.dropwizard.config.ConfigurationException;
-import com.yammer.dropwizard.config.ConfigurationFactory;
-import com.yammer.dropwizard.util.JarLocation;
-import com.yammer.dropwizard.validation.Validator;
-import com.yammer.metrics.HealthChecks;
+import io.dropwizard.client.JerseyClientConfiguration;
+import io.dropwizard.configuration.ConfigurationException;
+import io.dropwizard.configuration.ConfigurationFactory;
+import io.dropwizard.jackson.Jackson;
+import io.dropwizard.util.JarLocation;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
+import org.apache.curator.framework.CuratorFramework;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.validation.Validation;
+import javax.validation.Validator;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -101,7 +105,9 @@ public class DictionaryUser {
 
         // The service is partitioned, but partition filtering is configured by the ServiceFactory in this case
         // when the builder calls its configure() method.
-        DictionaryServiceFactory serviceFactory = new DictionaryServiceFactory(config.getHttpClientConfiguration());
+        JerseyClientConfiguration httpClientConfiguration = config.getHttpClientConfiguration();
+        MetricRegistry metrics = new MetricRegistry();
+        DictionaryServiceFactory serviceFactory = new DictionaryServiceFactory(httpClientConfiguration, metrics);
         DictionaryService service = ServicePoolBuilder.create(DictionaryService.class)
                 .withServiceFactory(serviceFactory)
                 .withHostDiscovery(new ZooKeeperHostDiscovery(curator, serviceFactory.getServiceName()))
@@ -111,7 +117,8 @@ public class DictionaryUser {
         // If using Yammer Metrics or running in Dropwizard (which includes Yammer Metrics), you may want a health
         // check that pings a service you depend on. This will register a simple check that will confirm the service
         // pool contains at least one healthy end point.
-        HealthChecks.register(ContainsHealthyEndPointCheck.forProxy(service, "dictionary-user"));
+        HealthCheckRegistry healthChecks = new HealthCheckRegistry();
+        healthChecks.register("dictionary-user", ContainsHealthyEndPointCheck.forProxy(service));
 
         DictionaryUser user = new DictionaryUser(service);
         for (String wordFile : parsedArgs.<String>getList("word-file")) {
@@ -119,7 +126,7 @@ public class DictionaryUser {
         }
 
         ServicePoolProxies.close(service);
-        Closeables.closeQuietly(curator);
+        Closeables.close(curator, true);
     }
 
     private static Namespace parseCommandLine(String[] args) throws ArgumentParserException {
@@ -132,8 +139,10 @@ public class DictionaryUser {
 
     private static DictionaryConfiguration loadConfigFile(String configFile)
             throws IOException, ConfigurationException {
-        ConfigurationFactory<DictionaryConfiguration> configFactory = ConfigurationFactory
-                .forClass(DictionaryConfiguration.class, new Validator());
+        Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+        ConfigurationFactory<DictionaryConfiguration> configFactory = new ConfigurationFactory<DictionaryConfiguration>(
+                DictionaryConfiguration.class, validator, Jackson.newObjectMapper(), "dictionary"
+        );
         if (configFile != null) {
             return configFactory.build(new File(configFile));
         } else {

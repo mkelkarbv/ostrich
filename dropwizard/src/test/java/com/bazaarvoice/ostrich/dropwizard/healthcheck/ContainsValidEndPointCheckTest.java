@@ -1,7 +1,7 @@
 package com.bazaarvoice.ostrich.dropwizard.healthcheck;
 
 import com.bazaarvoice.ostrich.ServicePool;
-import com.yammer.metrics.core.HealthCheck;
+import com.codahale.metrics.health.HealthCheck;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -18,22 +18,12 @@ public class ContainsValidEndPointCheckTest {
 
     @Before
     public void setup() {
-        _check = ContainsValidEndPointCheck.forPool(_pool, "test");
+        _check = ContainsValidEndPointCheck.forPool(_pool);
     }
 
     @Test (expected = NullPointerException.class)
     public void testNullPool() {
-        ContainsValidEndPointCheck.forPool(null, "test");
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testNullServiceName() {
-        ContainsValidEndPointCheck.forPool(_pool, null);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testEmptyServiceName() {
-        ContainsValidEndPointCheck.forPool(_pool, "");
+        ContainsValidEndPointCheck.forPool(null);
     }
 
     @Test

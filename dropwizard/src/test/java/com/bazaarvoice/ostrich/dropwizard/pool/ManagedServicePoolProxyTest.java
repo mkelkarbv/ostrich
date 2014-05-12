@@ -2,14 +2,13 @@ package com.bazaarvoice.ostrich.dropwizard.pool;
 
 import com.bazaarvoice.ostrich.ServicePool;
 import com.bazaarvoice.ostrich.pool.ServicePoolProxyHelper;
-import com.yammer.dropwizard.lifecycle.Managed;
+import io.dropwizard.lifecycle.Managed;
 import org.junit.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verifyZeroInteractions;
-import static org.mockito.Mockito.when;
 
 public class ManagedServicePoolProxyTest {
     @Test(expected = IllegalArgumentException.class)

@@ -2,7 +2,7 @@ package com.bazaarvoice.ostrich.dropwizard.healthcheck;
 
 import com.bazaarvoice.ostrich.ServicePool;
 import com.bazaarvoice.ostrich.pool.ServicePoolProxyHelper;
-import com.yammer.metrics.core.HealthCheck;
+import com.codahale.metrics.health.HealthCheck;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -15,28 +15,17 @@ import static org.mockito.Mockito.when;
 public class ContainsValidEndPointCheckWithProxyTest {
     private final ServicePool<Service> _pool = mock(ServicePool.class);
 
-    private Service _proxy;
     private HealthCheck _check;
 
     @Before
     public void setUp() {
-        _proxy = ServicePoolProxyHelper.createMock(Service.class, _pool);
-        _check = ContainsValidEndPointCheck.forProxy(_proxy, "test");
+        Service proxy = ServicePoolProxyHelper.createMock(Service.class, _pool);
+        _check = ContainsValidEndPointCheck.forProxy(proxy);
     }
 
     @Test (expected = NullPointerException.class)
     public void testNullPool() {
-        ContainsValidEndPointCheck.forProxy(null, "test");
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testNullServiceName() {
-        ContainsValidEndPointCheck.forProxy(_proxy, null);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testEmptyServiceName() {
-        ContainsValidEndPointCheck.forProxy(_proxy, "");
+        ContainsValidEndPointCheck.forProxy(null);
     }
 
     @Test

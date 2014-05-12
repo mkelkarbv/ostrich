@@ -1,6 +1,6 @@
 package com.bazaarvoice.ostrich.examples.calculator.service;
 
-import com.yammer.metrics.annotation.Timed;
+import com.codahale.metrics.annotation.Timed;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;

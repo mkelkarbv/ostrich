@@ -2,10 +2,8 @@ package com.bazaarvoice.ostrich.dropwizard.healthcheck;
 
 import com.bazaarvoice.ostrich.ServicePool;
 import com.bazaarvoice.ostrich.pool.ServicePoolProxies;
-import com.google.common.base.Strings;
-import com.yammer.metrics.core.HealthCheck;
+import com.codahale.metrics.health.HealthCheck;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
@@ -16,9 +14,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class ContainsValidEndPointCheck extends HealthCheck {
     private final ServicePool<?> _pool;
 
-    protected ContainsValidEndPointCheck(ServicePool<?> pool, String name) {
-        super(name);
-        checkArgument(!Strings.isNullOrEmpty(name));
+    protected ContainsValidEndPointCheck(ServicePool<?> pool) {
         _pool = checkNotNull(pool);
     }
 
@@ -26,10 +22,9 @@ public class ContainsValidEndPointCheck extends HealthCheck {
      * Returns a newly constructed health check for the given pool that will show as healthy if it has at least one valid end point.
      *
      * @param pool The {@code ServicePool} to look for valid end points in.
-     * @param name The name of the health check. May not be empty or null.
      */
-    public static ContainsValidEndPointCheck forPool(ServicePool<?> pool, String name) {
-        return new ContainsValidEndPointCheck(pool, name);
+    public static ContainsValidEndPointCheck forPool(ServicePool<?> pool) {
+        return new ContainsValidEndPointCheck(pool);
     }
 
     /**
@@ -37,10 +32,9 @@ public class ContainsValidEndPointCheck extends HealthCheck {
      * least one valid end point.
      *
      * @param proxy The {@code ServicePoolProxy} containing the service pool to look for valid end points in.
-     * @param name  The name of the health check. May not be empty or null.
      */
-    public static ContainsValidEndPointCheck forProxy(Object proxy, String name) {
-        return new ContainsValidEndPointCheck(ServicePoolProxies.getPool(proxy), name);
+    public static ContainsValidEndPointCheck forProxy(Object proxy) {
+        return new ContainsValidEndPointCheck(ServicePoolProxies.getPool(proxy));
     }
 
     @Override

@@ -3,6 +3,7 @@ package com.bazaarvoice.ostrich.examples.calculator.client;
 import com.bazaarvoice.ostrich.ServiceEndPoint;
 import com.bazaarvoice.ostrich.ServiceFactory;
 import com.bazaarvoice.ostrich.pool.ServicePoolBuilder;
+import com.codahale.metrics.MetricRegistry;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientHandlerException;
 import com.sun.jersey.api.client.UniformInterfaceException;
@@ -10,13 +11,14 @@ import com.sun.jersey.client.apache4.ApacheHttpClient4;
 import com.sun.jersey.client.apache4.ApacheHttpClient4Handler;
 import com.sun.jersey.client.apache4.config.ApacheHttpClient4Config;
 import com.sun.jersey.client.apache4.config.DefaultApacheHttpClient4Config;
-import com.yammer.dropwizard.client.HttpClientBuilder;
-import com.yammer.dropwizard.client.HttpClientConfiguration;
-import com.yammer.dropwizard.jersey.JacksonMessageBodyProvider;
-import com.yammer.dropwizard.json.ObjectMapperFactory;
-import com.yammer.dropwizard.validation.Validator;
+import io.dropwizard.client.HttpClientBuilder;
+import io.dropwizard.client.HttpClientConfiguration;
+import io.dropwizard.jackson.Jackson;
+import io.dropwizard.jersey.jackson.JacksonMessageBodyProvider;
 import org.apache.http.client.HttpClient;
 
+import javax.validation.Validation;
+import javax.validation.Validator;
 import java.net.URI;
 
 public class CalculatorServiceFactory implements ServiceFactory<CalculatorService> {
@@ -25,8 +27,8 @@ public class CalculatorServiceFactory implements ServiceFactory<CalculatorServic
     /**
      * Connects to the CalculatorService using the Apache commons http client library.
      */
-    public CalculatorServiceFactory(HttpClientConfiguration configuration) {
-        this(createDefaultJerseyClient(configuration));
+    public CalculatorServiceFactory(HttpClientConfiguration configuration, MetricRegistry metrics) {
+        this(createDefaultJerseyClient(configuration, metrics));
     }
 
     /**
@@ -37,11 +39,13 @@ public class CalculatorServiceFactory implements ServiceFactory<CalculatorServic
         _client = jerseyClient;
     }
 
-    private static ApacheHttpClient4 createDefaultJerseyClient(HttpClientConfiguration configuration) {
-        HttpClient httpClient = new HttpClientBuilder().using(configuration).build();
+    private static ApacheHttpClient4 createDefaultJerseyClient(HttpClientConfiguration configuration,
+                                                               MetricRegistry metrics) {
+        HttpClient httpClient = new HttpClientBuilder(metrics).using(configuration).build("calculator");
         ApacheHttpClient4Handler handler = new ApacheHttpClient4Handler(httpClient, null, true);
         ApacheHttpClient4Config config = new DefaultApacheHttpClient4Config();
-        config.getSingletons().add(new JacksonMessageBodyProvider(new ObjectMapperFactory().build(), new Validator()));
+        Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+        config.getSingletons().add(new JacksonMessageBodyProvider(Jackson.newObjectMapper(), validator));
         return new ApacheHttpClient4(handler, config);
     }
 

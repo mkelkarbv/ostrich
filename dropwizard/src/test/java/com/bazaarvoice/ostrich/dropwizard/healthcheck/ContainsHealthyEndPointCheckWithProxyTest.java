@@ -4,9 +4,9 @@ import com.bazaarvoice.ostrich.HealthCheckResult;
 import com.bazaarvoice.ostrich.HealthCheckResults;
 import com.bazaarvoice.ostrich.ServicePool;
 import com.bazaarvoice.ostrich.pool.ServicePoolProxyHelper;
+import com.codahale.metrics.health.HealthCheck;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import com.yammer.metrics.core.HealthCheck;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
@@ -27,7 +27,6 @@ public class ContainsHealthyEndPointCheckWithProxyTest {
     private final ServicePool<Service> _pool = mock(ServicePool.class);
     private final HealthCheckResults _results = mock(HealthCheckResults.class);
 
-    private Service _proxy;
     private HealthCheck _check;
 
     @Before
@@ -52,23 +51,13 @@ public class ContainsHealthyEndPointCheckWithProxyTest {
             }
         });
 
-        _proxy = ServicePoolProxyHelper.createMock(Service.class, _pool);
-        _check = ContainsHealthyEndPointCheck.forProxy(_proxy, "test");
+        Service _proxy = ServicePoolProxyHelper.createMock(Service.class, _pool);
+        _check = ContainsHealthyEndPointCheck.forProxy(_proxy);
     }
 
     @Test (expected = NullPointerException.class)
     public void testNullPool() {
-        ContainsHealthyEndPointCheck.forProxy(null, "test");
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testNullServiceName() {
-        ContainsHealthyEndPointCheck.forProxy(_proxy, null);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testEmptyServiceName() {
-        ContainsHealthyEndPointCheck.forProxy(_proxy, "");
+        ContainsHealthyEndPointCheck.forProxy(null);
     }
 
     @Test

@@ -1,6 +1,6 @@
 package com.bazaarvoice.ostrich.dropwizard.healthcheck;
 
-import com.yammer.metrics.core.HealthCheck;
+import com.codahale.metrics.health.HealthCheck;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
 
@@ -36,7 +36,6 @@ public class CachingHealthCheck extends HealthCheck {
      * @param maxTTL The {@code Duration} to wait before declaring a cached result stale.
      */
     public CachingHealthCheck(HealthCheck healthCheck, Duration minTTL, Duration maxTTL) {
-        super(healthCheck.getName());
         _healthCheck = healthCheck;
         _minTTL = minTTL;
         _maxTTL = maxTTL;
