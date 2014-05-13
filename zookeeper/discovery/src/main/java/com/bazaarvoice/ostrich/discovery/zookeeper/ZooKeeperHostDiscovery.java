@@ -8,6 +8,7 @@ import com.bazaarvoice.ostrich.metrics.Metrics;
 import com.codahale.metrics.Counter;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Meter;
+import com.codahale.metrics.MetricRegistry;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ConcurrentHashMultiset;
@@ -53,16 +54,18 @@ public class ZooKeeperHostDiscovery implements HostDiscovery {
     private final Meter _numZooKeeperRemoves;
     private final Meter _numZooKeeperChanges;
 
-    public ZooKeeperHostDiscovery(CuratorFramework curator, String serviceName) {
-        this(new NodeDiscoveryFactory(), curator, serviceName);
+    public ZooKeeperHostDiscovery(CuratorFramework curator, String serviceName, MetricRegistry metrics) {
+        this(new NodeDiscoveryFactory(), curator, serviceName, metrics);
     }
 
     @VisibleForTesting
-    ZooKeeperHostDiscovery(NodeDiscoveryFactory factory, CuratorFramework curator, String serviceName) {
+    ZooKeeperHostDiscovery(NodeDiscoveryFactory factory, CuratorFramework curator, String serviceName,
+                           MetricRegistry metrics) {
         checkNotNull(factory);
         checkNotNull(curator);
         checkNotNull(serviceName);
         checkArgument(!"".equals(serviceName));
+        checkNotNull(metrics);
 
         String servicePath = makeServicePath(serviceName);
 
@@ -82,7 +85,7 @@ public class ZooKeeperHostDiscovery implements HostDiscovery {
 
         _nodeDiscovery.addListener(new ServiceListener());
 
-        _metrics = Metrics.forInstance(this, serviceName);
+        _metrics = Metrics.forInstance(metrics, this, serviceName);
         _metrics.gauge("num-end-points", new Gauge<Integer>() {
             @Override
             public Integer getValue() {
@@ -190,7 +193,7 @@ public class ZooKeeperHostDiscovery implements HostDiscovery {
     static class NodeDiscoveryFactory {
         NodeDiscovery<ServiceEndPoint> create(CuratorFramework curator, String path,
                                               NodeDiscovery.NodeDataParser<ServiceEndPoint> parser) {
-            return new NodeDiscovery<ServiceEndPoint>(curator, path, parser);
+            return new NodeDiscovery<>(curator, path, parser);
         }
     }
 }

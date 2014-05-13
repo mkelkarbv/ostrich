@@ -6,6 +6,7 @@ import com.bazaarvoice.ostrich.ServiceCallback;
 import com.bazaarvoice.ostrich.ServiceEndPoint;
 import com.bazaarvoice.ostrich.ServiceEndPointPredicate;
 import com.bazaarvoice.ostrich.exceptions.MaxRetriesException;
+import com.codahale.metrics.MetricRegistry;
 import com.google.common.base.Ticker;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -34,6 +35,7 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.same;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -49,6 +51,7 @@ public class AsyncServicePoolTest {
     private final Ticker _mockTicker = mock(Ticker.class);
     private final ExecutorService _mockExecutor = mock(ExecutorService.class);
     private final Collection<AsyncServicePool<Service>> _asyncServicePools = Lists.newArrayList();
+    private final MetricRegistry _metricRegistry = mock(MetricRegistry.class, RETURNS_DEEP_STUBS);
 
     @Before
     public void setup() {
@@ -64,18 +67,18 @@ public class AsyncServicePoolTest {
 
     @Test(expected =  NullPointerException.class)
     public void testNullTicker() {
-        new AsyncServicePool<Service>(null, _mockPool, true, _mockExecutor, true);
+        new AsyncServicePool<>(null, _mockPool, true, _mockExecutor, true, _metricRegistry);
     }
 
     @Test(expected = NullPointerException.class)
     public void testNullServicePool() {
-        new AsyncServicePool<Service>(_mockTicker, null, true, _mockExecutor, true);
+        new AsyncServicePool<>(_mockTicker, null, true, _mockExecutor, true, _metricRegistry);
     }
 
     @SuppressWarnings("unchecked")
     @Test(expected = NullPointerException.class)
     public void testNullExecutorService() {
-        new AsyncServicePool<Service>(_mockTicker, _mockPool, true, null, true);
+        new AsyncServicePool<>(_mockTicker, _mockPool, true, null, true, _metricRegistry);
     }
 
     @SuppressWarnings("unchecked")
@@ -434,15 +437,15 @@ public class AsyncServicePoolTest {
     }
 
     private AsyncServicePool<Service> newAsyncPool(ExecutorService executor, boolean shutdownExecutorOnClose) {
-        AsyncServicePool<Service> pool =
-                new AsyncServicePool<Service>(_mockTicker, _mockPool, true, executor, shutdownExecutorOnClose);
+        AsyncServicePool<Service> pool = new AsyncServicePool<>(_mockTicker, _mockPool, true, executor,
+                shutdownExecutorOnClose, _metricRegistry);
         _asyncServicePools.add(pool);
         return pool;
     }
 
     private AsyncServicePool<Service> newAsyncPool(ServicePool<Service> pool, boolean shutdownPoolOnClose) {
-        AsyncServicePool<Service> asyncPool =
-                new AsyncServicePool<Service>(_mockTicker, pool, shutdownPoolOnClose, _mockExecutor, true);
+        AsyncServicePool<Service> asyncPool = new AsyncServicePool<>(_mockTicker, pool, shutdownPoolOnClose,
+                _mockExecutor, true, _metricRegistry);
         _asyncServicePools.add(asyncPool);
         return asyncPool;
     }

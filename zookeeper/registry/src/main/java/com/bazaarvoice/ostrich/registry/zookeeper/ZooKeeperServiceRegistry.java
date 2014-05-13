@@ -6,6 +6,7 @@ import com.bazaarvoice.ostrich.ServiceEndPointJsonCodec;
 import com.bazaarvoice.ostrich.ServiceRegistry;
 import com.bazaarvoice.ostrich.metrics.Metrics;
 import com.codahale.metrics.Counter;
+import com.codahale.metrics.MetricRegistry;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
 import com.google.common.cache.CacheBuilder;
@@ -56,22 +57,24 @@ public class ZooKeeperServiceRegistry implements ServiceRegistry
     /** The ephemeral data that's been written to ZooKeeper.  Saved in case the connection is lost and then regained. */
     private final Map<String, PersistentEphemeralNode> _nodes = Maps.newConcurrentMap();
 
-    private final Metrics.ClassMetrics _metrics = Metrics.forClass(ZooKeeperServiceRegistry.class);
-    private final LoadingCache<String, Counter> _numRegisteredEndpoints = CacheBuilder.newBuilder()
-            .build(new CacheLoader<String, Counter>() {
-                @Override
-                public Counter load(String serviceName) throws Exception {
-                    return _metrics.counter(serviceName, "num-registered-end-points");
-                }
-            });
+    private final Metrics.ClassMetrics _metrics;
+    private final LoadingCache<String, Counter> _numRegisteredEndpoints;
 
-    public ZooKeeperServiceRegistry(CuratorFramework curator) {
-        this(new NodeFactory(curator));
+    public ZooKeeperServiceRegistry(CuratorFramework curator, MetricRegistry metrics) {
+        this(new NodeFactory(curator), metrics);
     }
 
     @VisibleForTesting
-    ZooKeeperServiceRegistry(NodeFactory nodeFactory) {
+    ZooKeeperServiceRegistry(NodeFactory nodeFactory, MetricRegistry metrics) {
         _nodeFactory = checkNotNull(nodeFactory);
+        _metrics = Metrics.forClass(metrics, ZooKeeperServiceRegistry.class);
+        _numRegisteredEndpoints = CacheBuilder.newBuilder()
+                .build(new CacheLoader<String, Counter>() {
+                    @Override
+                    public Counter load(String serviceName) throws Exception {
+                        return _metrics.counter(serviceName, "num-registered-end-points");
+                    }
+                });
     }
 
     /** {@inheritDoc} */

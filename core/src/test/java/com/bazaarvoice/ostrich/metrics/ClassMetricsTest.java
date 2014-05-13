@@ -2,6 +2,7 @@ package com.bazaarvoice.ostrich.metrics;
 
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Metric;
+import com.codahale.metrics.MetricRegistry;
 import org.junit.After;
 import org.junit.Test;
 
@@ -14,7 +15,8 @@ import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
 
 public class ClassMetricsTest {
-    private final Metrics.ClassMetrics _metrics = Metrics.forClass(Service.class);
+    private final MetricRegistry _registry = new MetricRegistry();
+    private final Metrics.ClassMetrics _metrics = Metrics.forClass(_registry, Service.class);
 
     @After
     public void teardown() {
@@ -22,23 +24,13 @@ public class ClassMetricsTest {
     }
 
     @Test(expected = NullPointerException.class)
+    public void testNullRegistry() {
+        Metrics.forClass(null, Service.class);
+    }
+
+    @Test(expected = NullPointerException.class)
     public void testNullDomain() {
-        Metrics.forClass(null);
-    }
-
-    @Test(expected = NullPointerException.class)
-    public void testInstanceNullInstance() {
-        Metrics.forInstance(null, "serviceName");
-    }
-
-    @Test(expected = NullPointerException.class)
-    public void testInstanceNullServiceName() {
-        Metrics.forInstance(this, null);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testInstanceEmptyServiceName() {
-        Metrics.forInstance(this, "");
+        Metrics.forClass(_registry, null);
     }
 
     @Test
@@ -220,13 +212,13 @@ public class ClassMetricsTest {
 
     private void assertRegistered(String serviceName, String name) {
         String metricName = _metrics.name(serviceName, name);
-        Metric metric = Metrics.getMetricsRegistry().getMetrics().get(metricName);
+        Metric metric = _registry.getMetrics().get(metricName);
         assertNotNull(metric);
     }
 
     private void assertNotRegistered(String serviceName, String name) {
         String metricName = _metrics.name(serviceName, name);
-        Metric metric = Metrics.getMetricsRegistry().getMetrics().get(metricName);
+        Metric metric = _registry.getMetrics().get(metricName);
         assertNull(metric);
     }
 

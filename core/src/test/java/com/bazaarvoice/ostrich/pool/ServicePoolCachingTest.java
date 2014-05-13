@@ -11,6 +11,7 @@ import com.bazaarvoice.ostrich.ServicePoolStatistics;
 import com.bazaarvoice.ostrich.exceptions.MaxRetriesException;
 import com.bazaarvoice.ostrich.exceptions.ServiceException;
 import com.bazaarvoice.ostrich.partition.PartitionFilter;
+import com.codahale.metrics.MetricRegistry;
 import com.google.common.base.Throwables;
 import com.google.common.base.Ticker;
 import com.google.common.collect.ImmutableList;
@@ -67,6 +68,7 @@ public class ServicePoolCachingTest {
     private ScheduledExecutorService _healthCheckExecutor;
     private PartitionFilter _partitionFilter;
     private List<ServicePool<Service>> _pools = Lists.newArrayList();
+    private MetricRegistry _registry = new MetricRegistry();
 
     @SuppressWarnings("unchecked")
     @Before
@@ -321,8 +323,8 @@ public class ServicePoolCachingTest {
     }
 
     private ServicePool<Service> newPool(ServiceCachingPolicy cachingPolicy) {
-        ServicePool<Service> pool = new ServicePool<Service>(_ticker, _hostDiscovery, false, _serviceFactory,
-                cachingPolicy, _partitionFilter, _loadBalanceAlgorithm, _healthCheckExecutor, true);
+        ServicePool<Service> pool = new ServicePool<>(_ticker, _hostDiscovery, false, _serviceFactory, cachingPolicy,
+                _partitionFilter, _loadBalanceAlgorithm, _healthCheckExecutor, true, _registry);
         _pools.add(pool);
         return pool;
     }

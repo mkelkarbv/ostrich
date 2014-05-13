@@ -110,7 +110,8 @@ public class DictionaryUser {
         DictionaryServiceFactory serviceFactory = new DictionaryServiceFactory(httpClientConfiguration, metrics);
         DictionaryService service = ServicePoolBuilder.create(DictionaryService.class)
                 .withServiceFactory(serviceFactory)
-                .withHostDiscovery(new ZooKeeperHostDiscovery(curator, serviceFactory.getServiceName()))
+                .withHostDiscovery(new ZooKeeperHostDiscovery(curator, serviceFactory.getServiceName(), metrics))
+                .withMetricRegistry(metrics)
                 .withCachingPolicy(cachingPolicy)
                 .buildProxy(new ExponentialBackoffRetry(5, 50, 1000, TimeUnit.MILLISECONDS));
 
@@ -140,7 +141,7 @@ public class DictionaryUser {
     private static DictionaryConfiguration loadConfigFile(String configFile)
             throws IOException, ConfigurationException {
         Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
-        ConfigurationFactory<DictionaryConfiguration> configFactory = new ConfigurationFactory<DictionaryConfiguration>(
+        ConfigurationFactory<DictionaryConfiguration> configFactory = new ConfigurationFactory<>(
                 DictionaryConfiguration.class, validator, Jackson.newObjectMapper(), "dictionary"
         );
         if (configFile != null) {

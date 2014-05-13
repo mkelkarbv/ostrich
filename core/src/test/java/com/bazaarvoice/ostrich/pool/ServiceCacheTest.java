@@ -3,6 +3,7 @@ package com.bazaarvoice.ostrich.pool;
 import com.bazaarvoice.ostrich.ServiceEndPoint;
 import com.bazaarvoice.ostrich.ServiceFactory;
 import com.bazaarvoice.ostrich.exceptions.NoCachedInstancesAvailableException;
+import com.codahale.metrics.MetricRegistry;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import org.apache.commons.pool.impl.GenericKeyedObjectPool;
@@ -45,6 +46,7 @@ public class ServiceCacheTest {
 
     private ServiceFactory<Service> _factory;
     private ServiceCachingPolicy _cachingPolicy;
+    private MetricRegistry _registry = new MetricRegistry();
     private List<ServiceCache<?>> _caches = Lists.newArrayList();
 
     @SuppressWarnings("unchecked")
@@ -103,13 +105,13 @@ public class ServiceCacheTest {
     @Test(expected = NullPointerException.class)
     public void testCheckInToNullEndPoint() throws Exception {
         Service service = mock(Service.class);
-        ServiceHandle<Service> handle = new ServiceHandle<Service>(service, null);
+        ServiceHandle<Service> handle = new ServiceHandle<>(service, null);
         newCache().checkIn(handle);
     }
 
     @Test(expected = NullPointerException.class)
     public void testCheckInNullServiceInstance() throws Exception {
-        ServiceHandle<Service> handle = new ServiceHandle<Service>(null, END_POINT);
+        ServiceHandle<Service> handle = new ServiceHandle<>(null, END_POINT);
         newCache().checkIn(handle);
     }
 
@@ -543,13 +545,13 @@ public class ServiceCacheTest {
     }
 
     private ServiceCache<Service> newCache() {
-        ServiceCache<Service> cache = new ServiceCache<Service>(_cachingPolicy, _factory);
+        ServiceCache<Service> cache = new ServiceCache<>(_cachingPolicy, _factory, _registry);
         _caches.add(cache);
         return cache;
     }
 
     private ServiceCache<Service> newCache(ScheduledExecutorService executor) {
-        ServiceCache<Service> cache = new ServiceCache<Service>(_cachingPolicy, _factory, executor);
+        ServiceCache<Service> cache = new ServiceCache<>(_cachingPolicy, _factory, executor, _registry);
         _caches.add(cache);
         return cache;
     }
