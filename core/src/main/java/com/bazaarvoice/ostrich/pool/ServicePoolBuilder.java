@@ -41,7 +41,7 @@ public class ServicePoolBuilder<S> {
     private PartitionFilter _partitionFilter = new IdentityPartitionFilter();
     private PartitionContextSupplier _partitionContextSupplier = new EmptyPartitionContextSupplier();
     private LoadBalanceAlgorithm _loadBalanceAlgorithm = new RandomAlgorithm();
-    private MetricRegistry _metrics = new MetricRegistry();
+    private MetricRegistry _metrics;
     private ExecutorService _asyncExecutor;
 
     public static <S> ServicePoolBuilder<S> create(Class<S> serviceType) {
@@ -278,6 +278,7 @@ public class ServicePoolBuilder<S> {
     @VisibleForTesting
     ServicePool<S> buildInternal() {
         checkNotNull(_serviceFactory);
+        checkNotNull(_metrics);
 
         HostDiscovery hostDiscovery = findHostDiscovery(_serviceName);
 
