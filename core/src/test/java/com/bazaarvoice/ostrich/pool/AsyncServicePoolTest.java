@@ -35,7 +35,7 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.same;
-import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
+import static org.mockito.Mockito.RETURNS_MOCKS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -51,7 +51,7 @@ public class AsyncServicePoolTest {
     private final Ticker _mockTicker = mock(Ticker.class);
     private final ExecutorService _mockExecutor = mock(ExecutorService.class);
     private final Collection<AsyncServicePool<Service>> _asyncServicePools = Lists.newArrayList();
-    private final MetricRegistry _metricRegistry = mock(MetricRegistry.class, RETURNS_DEEP_STUBS);
+    private final MetricRegistry _metricRegistry = mock(MetricRegistry.class, RETURNS_MOCKS);
 
     @Before
     public void setup() {

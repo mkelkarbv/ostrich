@@ -75,8 +75,8 @@ public class ServicePoolTest {
     private ServiceFactory<Service> _serviceFactory;
     private ScheduledExecutorService _healthCheckExecutor;
     private ScheduledFuture<?> _healthCheckScheduledFuture;
+    private MetricRegistry _registry;
     private ServicePool<Service> _pool;
-    private MetricRegistry _registry = new MetricRegistry();
 
     @SuppressWarnings("unchecked")
     @Before
@@ -142,6 +142,8 @@ public class ServicePoolTest {
                     }
                 }
         );
+
+        _registry = new MetricRegistry();
 
         _pool = new ServicePool<>(_ticker, _hostDiscovery, false, _serviceFactory, UNLIMITED_CACHING, _partitionFilter,
                 _loadBalanceAlgorithm, _healthCheckExecutor, true, _registry);
