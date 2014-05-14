@@ -4,6 +4,7 @@ import com.bazaarvoice.ostrich.ServiceEndPoint;
 import com.bazaarvoice.ostrich.ServiceFactory;
 import com.bazaarvoice.ostrich.exceptions.NoCachedInstancesAvailableException;
 import com.bazaarvoice.ostrich.metrics.Metrics;
+import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.RatioGauge;
 import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
@@ -59,9 +60,10 @@ class ServiceCache<S> implements Closeable {
      *
      * @param policy         The configuration for this cache.
      * @param serviceFactory The factory to fall back to on cache misses.
+     * @param metrics        The metric registry.
      */
-    ServiceCache(ServiceCachingPolicy policy, ServiceFactory<S> serviceFactory) {
-        this(policy, serviceFactory, EVICTION_EXECUTOR);
+    ServiceCache(ServiceCachingPolicy policy, ServiceFactory<S> serviceFactory, MetricRegistry metrics) {
+        this(policy, serviceFactory, EVICTION_EXECUTOR, metrics);
     }
 
     /**
@@ -72,13 +74,14 @@ class ServiceCache<S> implements Closeable {
      * @param executor       The executor to use for checking for idle instances to evict.
      */
     @VisibleForTesting
-    ServiceCache(ServiceCachingPolicy policy, ServiceFactory<S> serviceFactory, ScheduledExecutorService executor) {
+    ServiceCache(ServiceCachingPolicy policy, ServiceFactory<S> serviceFactory, ScheduledExecutorService executor,
+                 MetricRegistry metrics) {
         checkNotNull(policy);
         checkNotNull(serviceFactory);
         checkNotNull(executor);
 
         String serviceName = serviceFactory.getServiceName();
-        _metrics = Metrics.forInstance(this, serviceName);
+        _metrics = Metrics.forInstance(metrics, this, serviceName);
         _loadTimer = _metrics.timer("load-time");
 
         _metrics.gauge("cache-hit-ratio", new RatioGauge() {
@@ -134,7 +137,7 @@ class ServiceCache<S> implements Closeable {
         // Make sure all instances in the pool are checked for staleness during eviction runs.
         poolConfig.numTestsPerEvictionRun = policy.getMaxNumServiceInstances();
 
-        _pool = new GenericKeyedObjectPool<ServiceEndPoint, S>(new PoolServiceFactory<S>(serviceFactory), poolConfig);
+        _pool = new GenericKeyedObjectPool<>(new PoolServiceFactory<>(serviceFactory), poolConfig);
 
         // Don't schedule eviction if not caching or not expiring stale instances.
         _evictionFuture = (policy.getMaxNumServiceInstances() != 0)
@@ -176,7 +179,7 @@ class ServiceCache<S> implements Closeable {
         try {
             long revision = _revisionNumber.incrementAndGet();
             S service = _pool.borrowObject(endPoint);
-            ServiceHandle<S> handle = new ServiceHandle<S>(service, endPoint);
+            ServiceHandle<S> handle = new ServiceHandle<>(service, endPoint);
 
             // Remember the revision that we've checked this service out on in case we need to invalidate it later
             _checkedOutRevisions.put(handle, revision);

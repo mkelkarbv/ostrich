@@ -98,7 +98,8 @@ public class CalculatorUser {
         CalculatorServiceFactory serviceFactory = new CalculatorServiceFactory(httpClientConfiguration, metrics);
         ServicePool<CalculatorService> pool = ServicePoolBuilder.create(CalculatorService.class)
                 .withServiceFactory(serviceFactory)
-                .withHostDiscovery(new ZooKeeperHostDiscovery(curator, serviceFactory.getServiceName()))
+                .withHostDiscovery(new ZooKeeperHostDiscovery(curator, serviceFactory.getServiceName(), metrics))
+                .withMetricRegistry(metrics)
                 .withCachingPolicy(cachingPolicy)
                 .build();
 
@@ -125,7 +126,7 @@ public class CalculatorUser {
     private static CalculatorConfiguration loadConfigFile(String configFile)
             throws IOException, ConfigurationException {
         Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
-        ConfigurationFactory<CalculatorConfiguration> configFactory = new ConfigurationFactory<CalculatorConfiguration>(
+        ConfigurationFactory<CalculatorConfiguration> configFactory = new ConfigurationFactory<>(
                 CalculatorConfiguration.class, validator, Jackson.newObjectMapper(), "calculator"
         );
         if (configFile != null) {

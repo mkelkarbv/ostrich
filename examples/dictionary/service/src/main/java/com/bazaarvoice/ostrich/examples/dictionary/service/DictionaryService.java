@@ -34,7 +34,7 @@ public class DictionaryService extends Application<DictionaryConfiguration> {
     }
 
     @Override
-    public void run(DictionaryConfiguration config, Environment env) throws Exception {
+    public void run(DictionaryConfiguration config, final Environment env) throws Exception {
         // Load the subset of the dictionary handled by this server.
         WordList wordList = new WordList(config.getWordFile(), config.getWordRange());
 
@@ -64,7 +64,7 @@ public class DictionaryService extends Application<DictionaryConfiguration> {
 
         final CuratorFramework curator = config.getZooKeeperConfiguration().newManagedCurator(env.lifecycle());
         env.lifecycle().manage(new Managed() {
-            ZooKeeperServiceRegistry registry = new ZooKeeperServiceRegistry(curator);
+            ZooKeeperServiceRegistry registry = new ZooKeeperServiceRegistry(curator, env.metrics());
 
             @Override
             public void start() throws Exception {

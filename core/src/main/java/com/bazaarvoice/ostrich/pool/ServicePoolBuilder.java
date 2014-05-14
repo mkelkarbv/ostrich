@@ -9,6 +9,7 @@ import com.bazaarvoice.ostrich.loadbalance.RandomAlgorithm;
 import com.bazaarvoice.ostrich.partition.IdentityPartitionFilter;
 import com.bazaarvoice.ostrich.partition.PartitionFilter;
 import com.bazaarvoice.ostrich.partition.PartitionKey;
+import com.codahale.metrics.MetricRegistry;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
@@ -40,10 +41,11 @@ public class ServicePoolBuilder<S> {
     private PartitionFilter _partitionFilter = new IdentityPartitionFilter();
     private PartitionContextSupplier _partitionContextSupplier = new EmptyPartitionContextSupplier();
     private LoadBalanceAlgorithm _loadBalanceAlgorithm = new RandomAlgorithm();
+    private MetricRegistry _metrics;
     private ExecutorService _asyncExecutor;
 
     public static <S> ServicePoolBuilder<S> create(Class<S> serviceType) {
-        return new ServicePoolBuilder<S>(serviceType);
+        return new ServicePoolBuilder<>(serviceType);
     }
 
     private ServicePoolBuilder(Class<S> serviceType) {
@@ -218,6 +220,16 @@ public class ServicePoolBuilder<S> {
         return this;
     }
 
+    /** Sets the {@code MetricRegistry} that should be used for this service.
+     *
+     * @param metrics The metric registry to use.
+     * @return this
+     */
+    public ServicePoolBuilder<S> withMetricRegistry(MetricRegistry metrics) {
+        _metrics = checkNotNull(metrics);
+        return this;
+    }
+
     /**
      * Builds a {@code com.bazaarvoice.ostrich.ServicePool}.
      *
@@ -244,7 +256,8 @@ public class ServicePoolBuilder<S> {
             _asyncExecutor = Executors.newCachedThreadPool(threadFactory);
         }
 
-        return new AsyncServicePool<S>(Ticker.systemTicker(), pool, true, _asyncExecutor, shutdownAsyncExecutorOnClose);
+        return new AsyncServicePool<>(Ticker.systemTicker(), pool, true, _asyncExecutor,
+                shutdownAsyncExecutorOnClose, _metrics);
     }
 
     /**
@@ -265,6 +278,7 @@ public class ServicePoolBuilder<S> {
     @VisibleForTesting
     ServicePool<S> buildInternal() {
         checkNotNull(_serviceFactory);
+        checkNotNull(_metrics);
 
         HostDiscovery hostDiscovery = findHostDiscovery(_serviceName);
 
@@ -283,9 +297,9 @@ public class ServicePoolBuilder<S> {
                                 .build());
             }
 
-            ServicePool<S> servicePool = new ServicePool<S>(Ticker.systemTicker(), hostDiscovery, _closeHostDiscovery,
+            ServicePool<S> servicePool = new ServicePool<>(Ticker.systemTicker(), hostDiscovery, _closeHostDiscovery,
                     _serviceFactory, _cachingPolicy, _partitionFilter, _loadBalanceAlgorithm, _healthCheckExecutor,
-                    shutdownHealthCheckExecutorOnClose);
+                    shutdownHealthCheckExecutorOnClose, _metrics);
 
             _closeHostDiscovery = false;
 

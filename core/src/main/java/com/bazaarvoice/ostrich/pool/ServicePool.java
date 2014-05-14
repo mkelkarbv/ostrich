@@ -21,6 +21,7 @@ import com.bazaarvoice.ostrich.metrics.Metrics;
 import com.bazaarvoice.ostrich.partition.PartitionFilter;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Meter;
+import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
@@ -76,7 +77,8 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
     ServicePool(Ticker ticker, HostDiscovery hostDiscovery, boolean cleanupHostDiscoveryOnClose,
                 ServiceFactory<S> serviceFactory, ServiceCachingPolicy cachingPolicy,
                 PartitionFilter partitionFilter, LoadBalanceAlgorithm loadBalanceAlgorithm,
-                ScheduledExecutorService healthCheckExecutor, boolean shutdownHealthCheckExecutorOnClose) {
+                ScheduledExecutorService healthCheckExecutor, boolean shutdownHealthCheckExecutorOnClose,
+                MetricRegistry metrics) {
         _ticker = checkNotNull(ticker);
         _hostDiscovery = checkNotNull(hostDiscovery);
         _cleanupHostDiscoveryOnClose = cleanupHostDiscoveryOnClose;
@@ -91,7 +93,7 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
                 .<ServiceEndPoint, Boolean>build()
                 .asMap());
         checkNotNull(cachingPolicy);
-        _serviceCache = new ServiceCache<S>(cachingPolicy, serviceFactory);
+        _serviceCache = new ServiceCache<>(cachingPolicy, serviceFactory, metrics);
         _partitionFilter = checkNotNull(partitionFilter);
         _loadBalanceAlgorithm = checkNotNull(loadBalanceAlgorithm);
 
@@ -133,7 +135,7 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
         _batchHealthChecksFuture = _healthCheckExecutor.scheduleAtFixedRate(new BatchHealthChecks(),
                 HEALTH_CHECK_POLL_INTERVAL_IN_SECONDS, HEALTH_CHECK_POLL_INTERVAL_IN_SECONDS, TimeUnit.SECONDS);
 
-        _metrics = Metrics.forInstance(this, _serviceFactory.getServiceName());
+        _metrics = Metrics.forInstance(metrics, this, _serviceFactory.getServiceName());
         _callbackExecutionTime = _metrics.timer("callback-execution-time");
         _healthCheckTime = _metrics.timer("health-check-time");
         _numExecuteSuccesses = _metrics.meter("num-execute-successes");

@@ -4,6 +4,7 @@ import com.bazaarvoice.curator.recipes.NodeDiscovery;
 import com.bazaarvoice.ostrich.ServiceEndPoint;
 import com.bazaarvoice.ostrich.ServiceEndPointBuilder;
 import com.bazaarvoice.ostrich.ServiceEndPointJsonCodec;
+import com.codahale.metrics.MetricRegistry;
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -38,6 +39,7 @@ public class ZooKeeperHostDiscoveryTest {
     private ZooKeeperHostDiscovery _discovery;
     private NodeDiscovery.NodeListener<ServiceEndPoint> _listener;
     private NodeDiscovery.NodeDataParser<ServiceEndPoint> _parser;
+    private MetricRegistry _registry = new MetricRegistry();
 
     @SuppressWarnings("unchecked")
     @Before
@@ -48,7 +50,7 @@ public class ZooKeeperHostDiscoveryTest {
         when(factory.create(Matchers.any(CuratorFramework.class), anyString(),
                 Matchers.<NodeDiscovery.NodeDataParser<ServiceEndPoint>>any())).thenReturn(nodeDiscovery);
 
-        _discovery = new ZooKeeperHostDiscovery(factory, curator, FOO.getServiceName());
+        _discovery = new ZooKeeperHostDiscovery(factory, curator, FOO.getServiceName(), _registry);
 
         // Capture the parser.
         ArgumentCaptor<NodeDiscovery.NodeDataParser<ServiceEndPoint>> parserCaptor =
@@ -70,17 +72,17 @@ public class ZooKeeperHostDiscoveryTest {
 
     @Test (expected = NullPointerException.class)
     public void testNullCurator() {
-        new ZooKeeperHostDiscovery(null, FOO.getServiceName());
+        new ZooKeeperHostDiscovery(null, FOO.getServiceName(), mock(MetricRegistry.class));
     }
 
     @Test (expected = NullPointerException.class)
     public void testNullServiceName() throws Exception {
-        new ZooKeeperHostDiscovery(mock(CuratorFramework.class), null);
+        new ZooKeeperHostDiscovery(mock(CuratorFramework.class), null, mock(MetricRegistry.class));
     }
 
     @Test (expected = IllegalArgumentException.class)
     public void testEmptyServiceName() throws Exception {
-        new ZooKeeperHostDiscovery(mock(CuratorFramework.class), "");
+        new ZooKeeperHostDiscovery(mock(CuratorFramework.class), "", mock(MetricRegistry.class));
     }
 
     @Test
@@ -141,7 +143,7 @@ public class ZooKeeperHostDiscoveryTest {
         }).when(nodeDiscovery).start();
 
         ZooKeeperHostDiscovery discovery = new ZooKeeperHostDiscovery(factory, mock(CuratorFramework.class),
-                FOO.getServiceName());
+                FOO.getServiceName(), _registry);
 
         assertEquals(ImmutableList.of(FOO), ImmutableList.copyOf(discovery.getHosts()));
 

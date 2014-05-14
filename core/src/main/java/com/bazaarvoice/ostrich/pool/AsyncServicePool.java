@@ -10,6 +10,7 @@ import com.bazaarvoice.ostrich.exceptions.NoAvailableHostsException;
 import com.bazaarvoice.ostrich.metrics.Metrics;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
+import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Ticker;
@@ -49,14 +50,14 @@ class AsyncServicePool<S> implements com.bazaarvoice.ostrich.AsyncServicePool<S>
     private final Histogram _executeBatchSize;
 
     AsyncServicePool(Ticker ticker, ServicePool<S> pool, boolean shutdownPoolOnClose,
-                            ExecutorService executor, boolean shutdownExecutorOnClose) {
+                            ExecutorService executor, boolean shutdownExecutorOnClose, MetricRegistry metrics) {
         _ticker = checkNotNull(ticker);
         _pool = checkNotNull(pool);
         _shutdownPoolOnClose = shutdownPoolOnClose;
         _executor = checkNotNull(executor);
         _shutdownExecutorOnClose = shutdownExecutorOnClose;
 
-        _metrics = Metrics.forInstance(this, _pool.getServiceName());
+        _metrics = Metrics.forInstance(metrics, this, _pool.getServiceName());
         _executionTime = _metrics.timer("execution-time");
         _numExecuteSuccesses = _metrics.meter("num-execute-successes");
         _numExecuteFailures = _metrics.meter("num-execute-failures");

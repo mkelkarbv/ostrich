@@ -2,7 +2,6 @@ package com.bazaarvoice.ostrich.examples.calculator.service;
 
 import com.bazaarvoice.ostrich.ServiceEndPoint;
 import com.bazaarvoice.ostrich.ServiceEndPointBuilder;
-import com.bazaarvoice.ostrich.metrics.Metrics;
 import com.bazaarvoice.ostrich.registry.zookeeper.ZooKeeperServiceRegistry;
 import com.google.common.collect.ImmutableMap;
 import io.dropwizard.Application;
@@ -36,11 +35,10 @@ public class CalculatorService extends Application<CalculatorConfiguration> {
 
     @Override
     public void initialize(Bootstrap<CalculatorConfiguration> bootstrap) {
-        Metrics.setMetricRegistry(bootstrap.getMetricRegistry());
     }
 
     @Override
-    public void run(CalculatorConfiguration config, Environment env) throws Exception {
+    public void run(CalculatorConfiguration config, final Environment env) throws Exception {
         env.jersey().register(CalculatorResource.class);
         env.jersey().register(ToggleHealthResource.class);
         env.healthChecks().register("calculator", new CalculatorHealthCheck());
@@ -65,7 +63,7 @@ public class CalculatorService extends Application<CalculatorConfiguration> {
 
         final CuratorFramework curator = config.getZooKeeperConfiguration().newManagedCurator(env.lifecycle());
         env.lifecycle().manage(new Managed() {
-            ZooKeeperServiceRegistry registry = new ZooKeeperServiceRegistry(curator);
+            ZooKeeperServiceRegistry registry = new ZooKeeperServiceRegistry(curator, env.metrics());
 
             @Override
             public void start() throws Exception {

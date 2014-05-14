@@ -15,6 +15,7 @@ import com.bazaarvoice.ostrich.exceptions.NoSuitableHostsException;
 import com.bazaarvoice.ostrich.exceptions.OnlyBadHostsException;
 import com.bazaarvoice.ostrich.exceptions.ServiceException;
 import com.bazaarvoice.ostrich.partition.PartitionFilter;
+import com.codahale.metrics.MetricRegistry;
 import com.google.common.base.Ticker;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -74,6 +75,7 @@ public class ServicePoolTest {
     private ServiceFactory<Service> _serviceFactory;
     private ScheduledExecutorService _healthCheckExecutor;
     private ScheduledFuture<?> _healthCheckScheduledFuture;
+    private MetricRegistry _registry;
     private ServicePool<Service> _pool;
 
     @SuppressWarnings("unchecked")
@@ -141,8 +143,10 @@ public class ServicePoolTest {
                 }
         );
 
-        _pool = new ServicePool<Service>(_ticker, _hostDiscovery, false, _serviceFactory, UNLIMITED_CACHING,
-                _partitionFilter, _loadBalanceAlgorithm, _healthCheckExecutor, true);
+        _registry = new MetricRegistry();
+
+        _pool = new ServicePool<>(_ticker, _hostDiscovery, false, _serviceFactory, UNLIMITED_CACHING, _partitionFilter,
+                _loadBalanceAlgorithm, _healthCheckExecutor, true, _registry);
     }
 
     @After
@@ -864,9 +868,9 @@ public class ServicePoolTest {
 
     @Test
     public void testDoesNotShutdownHealthCheckExecutorOnClose() {
-        ServicePool<Service> pool = new ServicePool<Service>(_ticker, _hostDiscovery, false, _serviceFactory,
+        ServicePool<Service> pool = new ServicePool<>(_ticker, _hostDiscovery, false, _serviceFactory,
                 ServiceCachingPolicyBuilder.NO_CACHING, _partitionFilter, _loadBalanceAlgorithm, _healthCheckExecutor,
-                false);
+                false, _registry);
         pool.close();
 
         verify(_healthCheckExecutor, never()).shutdown();
@@ -875,9 +879,9 @@ public class ServicePoolTest {
 
     @Test
     public void testDoesShutdownHealthCheckExecutorOnClose() {
-        ServicePool<Service> pool = new ServicePool<Service>(_ticker, _hostDiscovery, false, _serviceFactory,
+        ServicePool<Service> pool = new ServicePool<>(_ticker, _hostDiscovery, false, _serviceFactory,
                 ServiceCachingPolicyBuilder.NO_CACHING, _partitionFilter, _loadBalanceAlgorithm, _healthCheckExecutor,
-                true);
+                true, _registry);
         pool.close();
 
         verify(_healthCheckExecutor, never()).shutdown();
@@ -909,9 +913,9 @@ public class ServicePoolTest {
         // Redefine the end points that HostDiscovery knows about to be only FOO
         when(_hostDiscovery.getHosts()).thenReturn(ImmutableList.of(FOO_ENDPOINT));
 
-        ServicePool<Service> pool = new ServicePool<Service>(_ticker, _hostDiscovery, false, _serviceFactory,
+        ServicePool<Service> pool = new ServicePool<>(_ticker, _hostDiscovery, false, _serviceFactory,
                 ServiceCachingPolicyBuilder.NO_CACHING, _partitionFilter, _loadBalanceAlgorithm,
-                Executors.newScheduledThreadPool(1), true);
+                Executors.newScheduledThreadPool(1), true, _registry);
 
         // Make it so that FOO needs to be health checked...
         try {
