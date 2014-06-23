@@ -27,7 +27,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <java.minimum.version>1.7</java.minimum.version>
         <curator.extensions.version>1.4.0</curator.extensions.version>
-        <dropwizard.version>0.7.0</dropwizard.version>
+        <dropwizard.version>0.7.1</dropwizard.version>
     </properties>
 
     <build>
@@ -52,13 +52,13 @@
             <dependency>
                 <groupId>com.google.guava</groupId>
                 <artifactId>guava</artifactId>
-                <version>16.0.1</version>
+                <version>17.0</version>
             </dependency>
 
             <dependency>
                 <groupId>com.codahale.metrics</groupId>
                 <artifactId>metrics-core</artifactId>
-                <version>3.0.1</version>
+                <version>3.0.2</version>
             </dependency>
 
             <dependency>
