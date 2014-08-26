@@ -10,13 +10,12 @@ import com.bazaarvoice.ostrich.ServiceFactory;
 import com.bazaarvoice.ostrich.ServicePoolStatistics;
 import com.bazaarvoice.ostrich.exceptions.MaxRetriesException;
 import com.bazaarvoice.ostrich.exceptions.ServiceException;
+import com.bazaarvoice.ostrich.healthcheck.FixedHealthCheckRetryDelay;
 import com.bazaarvoice.ostrich.partition.PartitionFilter;
 import com.codahale.metrics.MetricRegistry;
 import com.google.common.base.Throwables;
 import com.google.common.base.Ticker;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
-import com.google.common.util.concurrent.Futures;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -33,15 +32,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import static com.google.common.collect.Lists.newArrayList;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -67,7 +65,7 @@ public class ServicePoolCachingTest {
     private LoadBalanceAlgorithm _loadBalanceAlgorithm;
     private ScheduledExecutorService _healthCheckExecutor;
     private PartitionFilter _partitionFilter;
-    private List<ServicePool<Service>> _pools = Lists.newArrayList();
+    private List<ServicePool<Service>> _pools = newArrayList();
     private MetricRegistry _registry = new MetricRegistry();
 
     @SuppressWarnings("unchecked")
@@ -98,26 +96,6 @@ public class ServicePoolCachingTest {
         when(_serviceFactory.isRetriableException(any(Exception.class))).thenReturn(true);
 
         _healthCheckExecutor = mock(ScheduledExecutorService.class);
-        when(_healthCheckExecutor.submit(any(Runnable.class))).then(new Answer<Future<?>>() {
-            @Override
-            public Future<?> answer(InvocationOnMock invocation) throws Throwable {
-                // Execute the runnable on this thread...
-                Runnable runnable = (Runnable) invocation.getArguments()[0];
-                runnable.run();
-
-                // The task is already complete, so the future should return null as per the ScheduledExecutorService
-                // contract.
-                return Futures.immediateFuture(null);
-            }
-        });
-        when(_healthCheckExecutor.scheduleAtFixedRate((Runnable) any(), anyLong(), anyLong(), (TimeUnit) any())).then(
-                new Answer<ScheduledFuture<?>>() {
-                    @Override
-                    public ScheduledFuture<?> answer(InvocationOnMock invocation) throws Throwable {
-                        return mock(ScheduledFuture.class);
-                    }
-                }
-        );
 
         _partitionFilter = mock(PartitionFilter.class);
         when(_partitionFilter.filter(any(Iterable.class), any(PartitionContext.class)))
@@ -184,6 +162,7 @@ public class ServicePoolCachingTest {
             // Expected
         }
 
+        pool.forceHealthChecks();
         assertNotSame(service, pool.execute(NEVER_RETRY, IDENTITY_CALLBACK));
     }
 
@@ -261,6 +240,7 @@ public class ServicePoolCachingTest {
             // Let the initial callback terminate...
             canReturn.countDown();
 
+            pool.forceHealthChecks();
             assertNotSame(serviceFuture.get(), pool.execute(NEVER_RETRY, IDENTITY_CALLBACK));
         } finally {
             executor.shutdown();
@@ -324,10 +304,11 @@ public class ServicePoolCachingTest {
 
     private ServicePool<Service> newPool(ServiceCachingPolicy cachingPolicy) {
         ServicePool<Service> pool = new ServicePool<>(_ticker, _hostDiscovery, false, _serviceFactory, cachingPolicy,
-                _partitionFilter, _loadBalanceAlgorithm, _healthCheckExecutor, true, _registry);
+                _partitionFilter, _loadBalanceAlgorithm, _healthCheckExecutor, true, FixedHealthCheckRetryDelay.ZERO, _registry);
         _pools.add(pool);
         return pool;
     }
 
-    private interface Service {}
+    private interface Service {
+    }
 }

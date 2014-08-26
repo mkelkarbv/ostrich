@@ -17,6 +17,7 @@ import com.bazaarvoice.ostrich.exceptions.NoCachedInstancesAvailableException;
 import com.bazaarvoice.ostrich.exceptions.NoSuitableHostsException;
 import com.bazaarvoice.ostrich.exceptions.OnlyBadHostsException;
 import com.bazaarvoice.ostrich.healthcheck.DefaultHealthCheckResults;
+import com.bazaarvoice.ostrich.healthcheck.HealthCheckRetryDelay;
 import com.bazaarvoice.ostrich.metrics.Metrics;
 import com.bazaarvoice.ostrich.partition.PartitionFilter;
 import com.codahale.metrics.Gauge;
@@ -40,6 +41,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Set;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -48,10 +50,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
     private static final Logger LOG = LoggerFactory.getLogger(ServicePool.class);
-
-    // By default check every minute to see if a previously unhealthy end point has become healthy.
-    @VisibleForTesting
-    static final long HEALTH_CHECK_POLL_INTERVAL_IN_SECONDS = 60;
 
     private final Ticker _ticker;
     private final HostDiscovery _hostDiscovery;
@@ -63,30 +61,31 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
     private final PartitionFilter _partitionFilter;
     private final LoadBalanceAlgorithm _loadBalanceAlgorithm;
     private final ServicePoolStatistics _servicePoolStatistics;
-    private final Set<ServiceEndPoint> _badEndPoints;
+    private final ConcurrentMap<ServiceEndPoint, HealthCheck> _badEndPoints;
     private final Predicate<ServiceEndPoint> _badEndPointFilter;
     private final Set<ServiceEndPoint> _recentlyRemovedEndPoints;
-    private final Future<?> _batchHealthChecksFuture;
     private final ServiceCache<S> _serviceCache;
     private final Metrics.InstanceMetrics _metrics;
     private final Timer _callbackExecutionTime;
     private final Timer _healthCheckTime;
     private final Meter _numExecuteSuccesses;
     private final Meter _numExecuteAttemptFailures;
+    private final HealthCheckRetryDelay _healthCheckRetryDelay;
 
     ServicePool(Ticker ticker, HostDiscovery hostDiscovery, boolean cleanupHostDiscoveryOnClose,
                 ServiceFactory<S> serviceFactory, ServiceCachingPolicy cachingPolicy,
                 PartitionFilter partitionFilter, LoadBalanceAlgorithm loadBalanceAlgorithm,
                 ScheduledExecutorService healthCheckExecutor, boolean shutdownHealthCheckExecutorOnClose,
-                MetricRegistry metrics) {
+                HealthCheckRetryDelay healthCheckRetryDelay, MetricRegistry metrics) {
+        _healthCheckRetryDelay = checkNotNull(healthCheckRetryDelay);
         _ticker = checkNotNull(ticker);
         _hostDiscovery = checkNotNull(hostDiscovery);
         _cleanupHostDiscoveryOnClose = cleanupHostDiscoveryOnClose;
         _serviceFactory = checkNotNull(serviceFactory);
         _healthCheckExecutor = checkNotNull(healthCheckExecutor);
         _shutdownHealthCheckExecutorOnClose = shutdownHealthCheckExecutorOnClose;
-        _badEndPoints = Sets.newSetFromMap(Maps.<ServiceEndPoint, Boolean>newConcurrentMap());
-        _badEndPointFilter = Predicates.not(Predicates.in(_badEndPoints));
+        _badEndPoints = Maps.newConcurrentMap();
+        _badEndPointFilter = Predicates.not(Predicates.in(_badEndPoints.keySet()));
         _recentlyRemovedEndPoints = Sets.newSetFromMap(CacheBuilder.newBuilder()
                 .ticker(_ticker)
                 .expireAfterWrite(10, TimeUnit.MINUTES)  // TODO: Make this a constant
@@ -131,10 +130,6 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
         };
         _hostDiscovery.addListener(_hostDiscoveryListener);
 
-        // Periodically wake up and check any bad end points to see if they're now healthy.
-        _batchHealthChecksFuture = _healthCheckExecutor.scheduleAtFixedRate(new BatchHealthChecks(),
-                HEALTH_CHECK_POLL_INTERVAL_IN_SECONDS, HEALTH_CHECK_POLL_INTERVAL_IN_SECONDS, TimeUnit.SECONDS);
-
         _metrics = Metrics.forInstance(metrics, this, _serviceFactory.getServiceName());
         _callbackExecutionTime = _metrics.timer("callback-execution-time");
         _healthCheckTime = _metrics.timer("health-check-time");
@@ -156,7 +151,9 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
 
     @Override
     public void close() {
-        _batchHealthChecksFuture.cancel(true);
+        for (HealthCheck healthCheck : _badEndPoints.values()) {
+            healthCheck.cancel(true);
+        }
 
         _hostDiscovery.removeListener(_hostDiscoveryListener);
         if (_cleanupHostDiscoveryOnClose) {
@@ -325,6 +322,7 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
 
     /**
      * NOTE: This method is package private specifically so that {@link AsyncServicePool} can call it.
+     *
      * @return The name of the service for this pool.
      */
     String getServiceName() {
@@ -353,7 +351,7 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
 
     @VisibleForTesting
     Set<ServiceEndPoint> getBadEndPoints() {
-        return ImmutableSet.copyOf(_badEndPoints);
+        return ImmutableSet.copyOf(_badEndPoints.keySet());
     }
 
     @Override
@@ -400,6 +398,17 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
         return aggregate;
     }
 
+    /**
+     * Run the health checks on all current unhealthy end points. This method blocks until the
+     * health checks have completed.
+     */
+    @VisibleForTesting
+    void forceHealthChecks() {
+        for (HealthCheck healthCheck : _badEndPoints.values()) {
+            healthCheck.run();
+        }
+    }
+
     private synchronized void addEndPoint(ServiceEndPoint endPoint) {
         _recentlyRemovedEndPoints.remove(endPoint);
         _badEndPoints.remove(endPoint);
@@ -428,8 +437,9 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
         _serviceCache.evict(endPoint);
 
         // Only schedule a health check if this is the first time we've seen this end point as bad...
-        if (_badEndPoints.add(endPoint)) {
-            _healthCheckExecutor.submit(new HealthCheck(endPoint));
+        HealthCheck healthCheck = new HealthCheck(endPoint);
+        if (_badEndPoints.putIfAbsent(endPoint, healthCheck) == null) {
+            healthCheck.start();
         }
     }
 
@@ -441,7 +451,7 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
         Stopwatch sw = Stopwatch.createStarted(_ticker);
 
         try {
-            return  _serviceFactory.isHealthy(endPoint)
+            return _serviceFactory.isHealthy(endPoint)
                     ? new SuccessfulHealthCheckResult(endPoint.getId(), sw.stop().elapsed(TimeUnit.NANOSECONDS))
                     : new FailedHealthCheckResult(endPoint.getId(), sw.stop().elapsed(TimeUnit.NANOSECONDS));
         } catch (Exception e) {
@@ -454,34 +464,59 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
     @VisibleForTesting
     final class HealthCheck implements Runnable {
         private final ServiceEndPoint _endPoint;
+        private final Object _syncRoot = new Object();
+        private int _count = 0;
+        private Future _future;
+        private boolean _cancelled;
 
         public HealthCheck(ServiceEndPoint endPoint) {
             _endPoint = endPoint;
         }
 
-        @Override
-        public void run() {
-            HealthCheckResult result = checkHealth(_endPoint);
-            if (result.isHealthy()) {
-                _badEndPoints.remove(_endPoint);
+        public void start() {
+            synchronized (_syncRoot) {
+                assert _future == null && !_cancelled;
+                _future = _healthCheckExecutor.submit(this);
             }
         }
-    }
 
-    @VisibleForTesting
-    final class BatchHealthChecks implements Runnable {
-        @Override
-        public void run() {
-            for (ServiceEndPoint endPoint : _badEndPoints) {
-                HealthCheckResult result = checkHealth(endPoint);
-                if (result.isHealthy()) {
-                    _badEndPoints.remove(endPoint);
+        public void cancel(boolean mayInterruptIfRunning) {
+            synchronized (_syncRoot) {
+                if (_future != null) {
+                    _future.cancel(mayInterruptIfRunning);
+                    _future = null;
                 }
 
-                // If we were interrupted during checking the health (but weren't blocked so an InterruptedException
-                // couldn't be thrown), then we should exit now.
-                if (Thread.currentThread().isInterrupted()) {
-                    break;
+                _cancelled = true;
+            }
+        }
+
+        @Override
+        public void run() {
+            synchronized (_syncRoot) {
+                if (_cancelled || _badEndPoints.get(_endPoint) != this) {
+                    return;
+                }
+            }
+
+            // Don't perform health check operation in lock as it could cause deadlock on cancel if
+            // health check stalls.
+            HealthCheckResult result = checkHealth(_endPoint);
+
+            synchronized (_syncRoot) {
+                _count += 1;
+
+                if (result.isHealthy()) {
+                    _badEndPoints.remove(_endPoint, this);
+                    this.cancel(false);
+                } else {
+                    long delayMillis = _healthCheckRetryDelay.getDelay(_count, result);
+
+                    if (_future != null) {
+                        _future.cancel(false); // In case this Runnable was invoked directly and not by scheduler
+                    }
+
+                    _future = _healthCheckExecutor.schedule(this, Math.max(0, delayMillis), TimeUnit.MILLISECONDS);
                 }
             }
         }
