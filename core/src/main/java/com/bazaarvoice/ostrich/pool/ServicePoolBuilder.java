@@ -5,6 +5,8 @@ import com.bazaarvoice.ostrich.HostDiscoverySource;
 import com.bazaarvoice.ostrich.LoadBalanceAlgorithm;
 import com.bazaarvoice.ostrich.RetryPolicy;
 import com.bazaarvoice.ostrich.ServiceFactory;
+import com.bazaarvoice.ostrich.healthcheck.ExponentialBackoffHealthCheckRetryDelay;
+import com.bazaarvoice.ostrich.healthcheck.HealthCheckRetryDelay;
 import com.bazaarvoice.ostrich.loadbalance.RandomAlgorithm;
 import com.bazaarvoice.ostrich.partition.IdentityPartitionFilter;
 import com.bazaarvoice.ostrich.partition.PartitionFilter;
@@ -23,6 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -30,6 +33,7 @@ import static java.lang.String.format;
 
 public class ServicePoolBuilder<S> {
     private static final int DEFAULT_NUM_HEALTH_CHECK_THREADS = 1;
+    private static final HealthCheckRetryDelay DEFAULT_HEALTH_CHECK_RETRY_POLICY = new ExponentialBackoffHealthCheckRetryDelay(100, 10_000, TimeUnit.MILLISECONDS);
 
     private final Class<S> _serviceType;
     private final List<HostDiscoverySource> _hostDiscoverySources = Lists.newArrayList();
@@ -43,6 +47,7 @@ public class ServicePoolBuilder<S> {
     private LoadBalanceAlgorithm _loadBalanceAlgorithm = new RandomAlgorithm();
     private MetricRegistry _metrics;
     private ExecutorService _asyncExecutor;
+    private HealthCheckRetryDelay _healthCheckRetryDelay = DEFAULT_HEALTH_CHECK_RETRY_POLICY;
 
     public static <S> ServicePoolBuilder<S> create(Class<S> serviceType) {
         return new ServicePoolBuilder<>(serviceType);
@@ -231,6 +236,17 @@ public class ServicePoolBuilder<S> {
     }
 
     /**
+     * Sets the {@code HealthCheckRetryPolicy} that should be used for this service.
+     *
+     * @param healthCheckRetryDelay retry policy to use
+     * @return this
+     */
+    public ServicePoolBuilder<S> withHealthCheckRetryPolicy(HealthCheckRetryDelay healthCheckRetryDelay) {
+        _healthCheckRetryDelay = checkNotNull(healthCheckRetryDelay);
+        return this;
+    }
+
+    /**
      * Builds a {@code com.bazaarvoice.ostrich.ServicePool}.
      *
      * @return The {@code com.bazaarvoice.ostrich.ServicePool} that was constructed.
@@ -299,7 +315,7 @@ public class ServicePoolBuilder<S> {
 
             ServicePool<S> servicePool = new ServicePool<>(Ticker.systemTicker(), hostDiscovery, _closeHostDiscovery,
                     _serviceFactory, _cachingPolicy, _partitionFilter, _loadBalanceAlgorithm, _healthCheckExecutor,
-                    shutdownHealthCheckExecutorOnClose, _metrics);
+                    shutdownHealthCheckExecutorOnClose, _healthCheckRetryDelay, _metrics);
 
             _closeHostDiscovery = false;
 

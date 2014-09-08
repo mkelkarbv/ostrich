@@ -14,13 +14,13 @@ import com.bazaarvoice.ostrich.exceptions.NoAvailableHostsException;
 import com.bazaarvoice.ostrich.exceptions.NoSuitableHostsException;
 import com.bazaarvoice.ostrich.exceptions.OnlyBadHostsException;
 import com.bazaarvoice.ostrich.exceptions.ServiceException;
+import com.bazaarvoice.ostrich.healthcheck.FixedHealthCheckRetryDelay;
 import com.bazaarvoice.ostrich.partition.PartitionFilter;
 import com.codahale.metrics.MetricRegistry;
 import com.google.common.base.Ticker;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
-import com.google.common.util.concurrent.Futures;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -34,9 +34,7 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -46,7 +44,6 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.eq;
@@ -74,7 +71,6 @@ public class ServicePoolTest {
     private LoadBalanceAlgorithm _loadBalanceAlgorithm;
     private ServiceFactory<Service> _serviceFactory;
     private ScheduledExecutorService _healthCheckExecutor;
-    private ScheduledFuture<?> _healthCheckScheduledFuture;
     private MetricRegistry _registry;
     private ServicePool<Service> _pool;
 
@@ -103,14 +99,14 @@ public class ServicePoolTest {
         _loadBalanceAlgorithm = mock(LoadBalanceAlgorithm.class);
         when(_loadBalanceAlgorithm.choose(any(Iterable.class), any(ServicePoolStatistics.class)))
                 .thenAnswer(new Answer<ServiceEndPoint>() {
-            @Override
-            public ServiceEndPoint answer(InvocationOnMock invocation) throws Throwable {
-                // Always choose the first end point.  This is probably fine since most tests will have just a single
-                // end point available anyways.
-                Iterable<ServiceEndPoint> endPoints = (Iterable<ServiceEndPoint>) invocation.getArguments()[0];
-                return endPoints.iterator().next();
-            }
-        });
+                    @Override
+                    public ServiceEndPoint answer(InvocationOnMock invocation) throws Throwable {
+                        // Always choose the first end point.  This is probably fine since most tests will have just a single
+                        // end point available anyways.
+                        Iterable<ServiceEndPoint> endPoints = (Iterable<ServiceEndPoint>) invocation.getArguments()[0];
+                        return endPoints.iterator().next();
+                    }
+                });
 
         _serviceFactory = (ServiceFactory<Service>) mock(ServiceFactory.class);
         when(_serviceFactory.getServiceName()).thenReturn(Service.class.getSimpleName());
@@ -120,33 +116,11 @@ public class ServicePoolTest {
         when(_serviceFactory.isRetriableException(any(Exception.class))).thenReturn(true);
 
         _healthCheckExecutor = mock(ScheduledExecutorService.class);
-        when(_healthCheckExecutor.submit(any(Runnable.class))).then(new Answer<Future<?>>() {
-            @Override
-            public Future<?> answer(InvocationOnMock invocation) throws Throwable {
-                // Execute the runnable on this thread...
-                Runnable runnable = (Runnable) invocation.getArguments()[0];
-                runnable.run();
-
-                // The task is already complete, so the future should return null as per the ScheduledExecutorService
-                // contract.
-                return Futures.immediateFuture(null);
-            }
-        });
-
-        _healthCheckScheduledFuture = mock(ScheduledFuture.class);
-        when(_healthCheckExecutor.scheduleAtFixedRate((Runnable) any(), anyLong(), anyLong(), (TimeUnit) any())).then(
-                new Answer<ScheduledFuture<?>>() {
-                    @Override
-                    public ScheduledFuture<?> answer(InvocationOnMock invocation) throws Throwable {
-                        return _healthCheckScheduledFuture;
-                    }
-                }
-        );
 
         _registry = new MetricRegistry();
 
         _pool = new ServicePool<>(_ticker, _hostDiscovery, false, _serviceFactory, UNLIMITED_CACHING, _partitionFilter,
-                _loadBalanceAlgorithm, _healthCheckExecutor, true, _registry);
+                _loadBalanceAlgorithm, _healthCheckExecutor, true, FixedHealthCheckRetryDelay.ZERO, _registry);
     }
 
     @After
@@ -470,17 +444,6 @@ public class ServicePoolTest {
     }
 
     @Test
-    public void testSchedulesPeriodicHealthCheckUponCreation() {
-        // The pool was already created so the health check executor should have been used already.
-
-        verify(_healthCheckExecutor).scheduleAtFixedRate(
-                any(com.bazaarvoice.ostrich.pool.ServicePool.BatchHealthChecks.class),
-                eq(com.bazaarvoice.ostrich.pool.ServicePool.HEALTH_CHECK_POLL_INTERVAL_IN_SECONDS),
-                eq(com.bazaarvoice.ostrich.pool.ServicePool.HEALTH_CHECK_POLL_INTERVAL_IN_SECONDS),
-                eq(TimeUnit.SECONDS));
-    }
-
-    @Test
     public void testStatsPassedToLoadBalancer() {
         _pool.execute(NEVER_RETRY, new ServiceCallback<Service, Void>() {
             @Override
@@ -653,15 +616,6 @@ public class ServicePoolTest {
     }
 
     @Test
-    public void testCancelsPeriodicHealthCheckAfterClose() {
-        // Future shouldn't be used until after we close...
-        verifyZeroInteractions(_healthCheckScheduledFuture);
-
-        _pool.close();
-        verify(_healthCheckScheduledFuture).cancel(anyBoolean());
-    }
-
-    @Test
     public void testCallsHealthCheckAfterRetriableException() throws InterruptedException {
         final AtomicBoolean healthCheckCalled = new AtomicBoolean(false);
         when(_serviceFactory.isHealthy(any(ServiceEndPoint.class))).then(new Answer<Boolean>() {
@@ -685,8 +639,7 @@ public class ServicePoolTest {
             // Expected exception
         }
 
-        // A health check should have been called...we use the equivalent of a same thread executor, so we know that
-        // it's been called already.  No need to wait.
+        _pool.forceHealthChecks();
         assertTrue(healthCheckCalled.get());
     }
 
@@ -717,8 +670,7 @@ public class ServicePoolTest {
         when(_serviceFactory.isHealthy(eq(BAZ_ENDPOINT))).thenReturn(true);
 
         // Exhaust all of the end points...
-        int numEndPointsAvailable = Iterables.size(_hostDiscovery.getHosts());
-        for (int i = 0; i < numEndPointsAvailable; i++) {
+        for (ServiceEndPoint ignored : _hostDiscovery.getHosts()) {
             try {
                 _pool.execute(NEVER_RETRY, new ServiceCallback<Service, Void>() {
                     @Override
@@ -731,6 +683,8 @@ public class ServicePoolTest {
                 // Expected
             }
         }
+
+        _pool.forceHealthChecks();
 
         // BAZ should still be healthy, so this shouldn't throw an exception.
         Service usedService = _pool.execute(NEVER_RETRY, new ServiceCallback<Service, Service>() {
@@ -763,21 +717,14 @@ public class ServicePoolTest {
         // Set it up so that when we health check FOO, that it becomes healthy.
         when(_serviceFactory.isHealthy(FOO_ENDPOINT)).thenReturn(true);
 
-        // Capture the BatchHealthChecks runnable that was registered with the executor so that we can execute it.
-        ArgumentCaptor<Runnable> check = ArgumentCaptor.forClass(Runnable.class);
-        verify(_healthCheckExecutor).scheduleAtFixedRate(check.capture(), anyLong(), anyLong(), any(TimeUnit.class));
+        _pool.forceHealthChecks();
 
-        // Execute the background health checks, this should make FOO healthy again.
-        check.getValue().run();
-
-        // FOO should be healthy so we shouldn't get an exception.
-        Service usedService = _pool.execute(NEVER_RETRY, new ServiceCallback<Service, Service>() {
+        assertSame(FOO_SERVICE, _pool.execute(NEVER_RETRY, new ServiceCallback<Service, Service>() {
             @Override
             public Service call(Service service) throws ServiceException {
                 return service;
             }
-        });
-        assertSame(FOO_SERVICE, usedService);
+        }));
     }
 
     @SuppressWarnings("unchecked")
@@ -812,12 +759,7 @@ public class ServicePoolTest {
         // Now, have HostDiscovery fire an event saying that FOO has been removed
         listener.getValue().onEndPointRemoved(FOO_ENDPOINT);
 
-        // Capture the BatchHealthChecks runnable that was registered with the executor so that we can execute it.
-        ArgumentCaptor<Runnable> check = ArgumentCaptor.forClass(Runnable.class);
-        verify(_healthCheckExecutor).scheduleAtFixedRate(check.capture(), anyLong(), anyLong(), any(TimeUnit.class));
-
-        // Execute the background health checks, this shouldn't check FOO at all
-        check.getValue().run();
+        _pool.forceHealthChecks();
 
         verify(_serviceFactory, never()).isHealthy(eq(FOO_ENDPOINT));
     }
@@ -870,7 +812,7 @@ public class ServicePoolTest {
     public void testDoesNotShutdownHealthCheckExecutorOnClose() {
         ServicePool<Service> pool = new ServicePool<>(_ticker, _hostDiscovery, false, _serviceFactory,
                 ServiceCachingPolicyBuilder.NO_CACHING, _partitionFilter, _loadBalanceAlgorithm, _healthCheckExecutor,
-                false, _registry);
+                false, FixedHealthCheckRetryDelay.ZERO, _registry);
         pool.close();
 
         verify(_healthCheckExecutor, never()).shutdown();
@@ -881,7 +823,7 @@ public class ServicePoolTest {
     public void testDoesShutdownHealthCheckExecutorOnClose() {
         ServicePool<Service> pool = new ServicePool<>(_ticker, _hostDiscovery, false, _serviceFactory,
                 ServiceCachingPolicyBuilder.NO_CACHING, _partitionFilter, _loadBalanceAlgorithm, _healthCheckExecutor,
-                true, _registry);
+                true, FixedHealthCheckRetryDelay.ZERO, _registry);
         pool.close();
 
         verify(_healthCheckExecutor, never()).shutdown();
@@ -915,7 +857,7 @@ public class ServicePoolTest {
 
         ServicePool<Service> pool = new ServicePool<>(_ticker, _hostDiscovery, false, _serviceFactory,
                 ServiceCachingPolicyBuilder.NO_CACHING, _partitionFilter, _loadBalanceAlgorithm,
-                Executors.newScheduledThreadPool(1), true, _registry);
+                Executors.newScheduledThreadPool(1), true, new FixedHealthCheckRetryDelay(100, TimeUnit.MILLISECONDS), _registry);
 
         // Make it so that FOO needs to be health checked...
         try {
@@ -966,6 +908,8 @@ public class ServicePoolTest {
                 // Expected
             }
         }
+
+        _pool.forceHealthChecks();
 
         // Only BAZ should be healthy
         assertEquals(1, _pool.getNumValidEndPoints());
