@@ -45,11 +45,18 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
     private static final Logger LOG = LoggerFactory.getLogger(ServicePool.class);
+
+    /**
+     * Number of seconds between bad endpoint health check verification runs.
+     */
+    private static final int HEALTH_CHECK_VERIFY_SECS = 30;
 
     private final Ticker _ticker;
     private final HostDiscovery _hostDiscovery;
@@ -147,6 +154,13 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
                 return getNumBadEndPoints();
             }
         });
+
+        // Periodically ensure that health checks for unhealthy endpoints are still running
+        _healthCheckExecutor.scheduleAtFixedRate(
+                new HealthCheckVerifier(),
+                HEALTH_CHECK_VERIFY_SECS,
+                HEALTH_CHECK_VERIFY_SECS,
+                TimeUnit.SECONDS);
     }
 
     @Override
@@ -462,48 +476,91 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
     }
 
     @VisibleForTesting
+    final class HealthCheckVerifier implements Runnable {
+        @Override
+        public void run() {
+            try {
+                for (HealthCheck healthCheck : _badEndPoints.values()) {
+                    healthCheck.verifyScheduling();
+                }
+            } catch (Throwable ex) {
+                LOG.warn("Error rescheduling health checks", ex);
+            }
+        }
+    }
+
+    @VisibleForTesting
     final class HealthCheck implements Runnable {
         private final ServiceEndPoint _endPoint;
-        private final Object _syncRoot = new Object();
+        private final Lock _lock = new ReentrantLock();
         private int _count = 0;
         private Future _future;
         private boolean _cancelled;
+        private boolean _scheduled;
+        private boolean _running;
 
         public HealthCheck(ServiceEndPoint endPoint) {
             _endPoint = endPoint;
         }
 
         public void start() {
-            synchronized (_syncRoot) {
+            _lock.lock();
+            try {
                 assert _future == null && !_cancelled;
                 _future = _healthCheckExecutor.submit(this);
+                _scheduled = true;
+            } finally {
+                _lock.unlock();
             }
         }
 
         public void cancel(boolean mayInterruptIfRunning) {
-            synchronized (_syncRoot) {
+            _lock.lock();
+            try {
                 if (_future != null) {
                     _future.cancel(mayInterruptIfRunning);
                     _future = null;
                 }
 
                 _cancelled = true;
+            } finally {
+                _lock.unlock();
+            }
+        }
+
+        public void verifyScheduling() {
+            _lock.lock();
+            try {
+                if (!_cancelled && !_running && !_scheduled) {
+                    _healthCheckExecutor.submit(this);
+                    _scheduled = true;
+                }
+            } finally {
+                _lock.unlock();
             }
         }
 
         @Override
         public void run() {
-            synchronized (_syncRoot) {
+            _lock.lock();
+            try {
                 if (_cancelled || _badEndPoints.get(_endPoint) != this) {
                     return;
                 }
-            }
 
-            // Don't perform health check operation in lock as it could cause deadlock on cancel if
-            // health check stalls.
-            HealthCheckResult result = checkHealth(_endPoint);
+                _scheduled = false;
+                _running = true;
 
-            synchronized (_syncRoot) {
+                // Don't perform health check operation in lock as it could cause deadlock on cancel if
+                // health check stalls.
+                HealthCheckResult result;
+                _lock.unlock();
+                try {
+                    result = checkHealth(_endPoint);
+                } finally {
+                    _lock.lock();
+                }
+
                 _count += 1;
 
                 if (result.isHealthy()) {
@@ -517,7 +574,11 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
                     }
 
                     _future = _healthCheckExecutor.schedule(this, Math.max(0, delayMillis), TimeUnit.MILLISECONDS);
+                    _scheduled = true;
                 }
+            } finally {
+                _running = false;
+                _lock.unlock();
             }
         }
     }
