@@ -21,6 +21,7 @@ import com.google.common.base.Ticker;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.Futures;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -34,6 +35,7 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -51,7 +53,9 @@ import static org.mockito.Matchers.same;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
@@ -402,6 +406,47 @@ public class ServicePoolTest {
         } catch (OnlyBadHostsException expected) {
             assertSame(e, expected.getCause());
         }
+    }
+
+    @Test
+    public void testHealthCheckIsRescheduled() {
+        ArgumentCaptor<ServicePool.HealthCheckVerifier> healthCheckVerifierCaptor = ArgumentCaptor.forClass(ServicePool.HealthCheckVerifier.class);
+        verify(_healthCheckExecutor).scheduleAtFixedRate(healthCheckVerifierCaptor.capture(), anyLong(), anyLong(), any(TimeUnit.class));
+        ServicePool.HealthCheckVerifier healthCheckVerifier = healthCheckVerifierCaptor.getValue();
+
+        when(_healthCheckExecutor.submit(any(ServicePool.HealthCheck.class))).thenThrow(NullPointerException.class);
+
+        try {
+            _pool.execute(NEVER_RETRY, new ServiceCallback<Service, Void>() {
+                @Override
+                public Void call(Service service) throws ServiceException {
+                    throw new ServiceException();
+                }
+            });
+
+            fail();
+        } catch (MaxRetriesException expected) {
+            // Expected exception
+        }
+
+        verify(_healthCheckExecutor, times(1)).submit(any(ServicePool.HealthCheck.class));
+
+        // Health check was not scheduled, so run the verify process to reschedule.
+        // Scheduling fails, so next verify run will schedule again.
+        healthCheckVerifier.run();
+        verify(_healthCheckExecutor, times(2)).submit(any(ServicePool.HealthCheck.class));
+
+        // Ensure next scheduling attempt is successful
+        reset(_healthCheckExecutor);
+        when(_healthCheckExecutor.submit(any(ServicePool.HealthCheck.class))).thenReturn(mock(Future.class));
+
+        // Verification successfully schedules the health check
+        healthCheckVerifier.run();
+        verify(_healthCheckExecutor, times(1)).submit(any(ServicePool.HealthCheck.class));
+
+        // Running verification again does not schedule the health check again
+        healthCheckVerifier.run();
+        verify(_healthCheckExecutor, times(1)).submit(any(ServicePool.HealthCheck.class));
     }
 
     @Test
