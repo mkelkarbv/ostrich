@@ -18,6 +18,11 @@ import org.apache.commons.lang3.RandomStringUtils;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * This needs to be in the com.bazaarvoice.ostrich.pool package so that it can have direct access to ServiceCache
+ *
+ * This instantiates a service cache, creates threads to run test on and exposes various metrics for monitoring
+ */
 @SuppressWarnings ("deprecation")
 public class ServiceRunner {
 
@@ -31,7 +36,11 @@ public class ServiceRunner {
     private final Timer _checkinTimer;
     private final Timer _totalExecTimer;
 
-    ServiceRunner(Builder builder) {
+    /**
+     * private constructor to prohibit instantiation
+     * @param builder
+     */
+    private ServiceRunner(Builder builder) {
         _workSize = builder._workSize;
         _threadSize = builder._threadSize;
 

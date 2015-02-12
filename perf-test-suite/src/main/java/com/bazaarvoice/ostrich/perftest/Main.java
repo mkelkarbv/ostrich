@@ -2,11 +2,10 @@ package com.bazaarvoice.ostrich.perftest;
 
 import com.bazaarvoice.ostrich.perftest.utils.Arguments;
 import com.bazaarvoice.ostrich.perftest.utils.LoadRunner;
-import org.apache.commons.cli.ParseException;
 
 public class Main {
 
-    public static void main(String args[]) throws InterruptedException, ParseException {
+    public static void main(String args[]) {
 
         Arguments arguments = new Arguments(args);
         LoadRunner loadRunner = new LoadRunner(arguments);

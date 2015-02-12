@@ -10,6 +10,11 @@ import java.io.PrintStream;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+
+/**
+ * This class creates the service runner and runs the requested load as parsed via Arguments
+ * This also prints/writes the report log and/or the statistics as requested in the Arguments
+ */
 public class LoadRunner {
 
     private final PrintStream out;
@@ -51,7 +56,7 @@ public class LoadRunner {
         this.startTime = currentTimeSeconds();
     }
 
-    public void printLog() throws InterruptedException {
+    public void printLog() {
 
         long currentRuntime = currentTimeSeconds() - startTime;
 
@@ -106,7 +111,9 @@ public class LoadRunner {
             System.out.flush();
         }
 
-        Thread.sleep(TimeUnit.SECONDS.toMillis(reportingIntervalSeconds));
+        try {
+            Thread.sleep(TimeUnit.SECONDS.toMillis(reportingIntervalSeconds));
+        } catch(InterruptedException ignored) {}
     }
 
     public void printHeaders() {

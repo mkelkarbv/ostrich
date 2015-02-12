@@ -4,6 +4,9 @@ import org.apache.commons.codec.digest.DigestUtils;
 
 import java.util.Random;
 
+/**
+ * Various singleton hash function to mimic workload
+ */
 public enum HashFunction {
     SHA1 {
         @Override

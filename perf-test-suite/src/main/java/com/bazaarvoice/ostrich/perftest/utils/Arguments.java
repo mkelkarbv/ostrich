@@ -7,13 +7,16 @@ import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
-import org.apache.commons.cli.ParseException;
 
 import java.io.File;
 import java.io.PrintStream;
 
 import static com.bazaarvoice.ostrich.pool.ServiceCachingPolicy.ExhaustionAction;
 
+/**
+ * This class parses and holds onto the parsed variable.
+ * It also handles bad arguments appropriately, and prints message to help rectify them.
+ */
 @SuppressWarnings ("deprecation")
 public class Arguments {
 
@@ -28,7 +31,7 @@ public class Arguments {
     private boolean _printStats = false;
 
 
-    public Arguments(String[] args) throws ParseException {
+    public Arguments(String[] args) {
         parseArgs(args);
     }
 

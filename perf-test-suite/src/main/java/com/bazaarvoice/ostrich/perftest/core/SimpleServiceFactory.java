@@ -11,6 +11,9 @@ import com.yammer.metrics.core.TimerContext;
 
 import java.util.concurrent.TimeUnit;
 
+/**
+ * A service factory, as needed in the ServiceCache
+ */
 public class SimpleServiceFactory implements ServiceFactory<Service<String, String>> {
 
     private final Meter serviceCreated;
@@ -18,12 +21,19 @@ public class SimpleServiceFactory implements ServiceFactory<Service<String, Stri
     private final Timer serviceTimer;
 
 
+    /**
+     * private constructor
+     */
     private SimpleServiceFactory() {
         serviceCreated = Metrics.newMeter(this.getClass(), "Created", "created", TimeUnit.SECONDS);
         serviceDestroyed = Metrics.newMeter(this.getClass(), "Destroyed", "destroyed", TimeUnit.SECONDS);
         serviceTimer = Metrics.newTimer(this.getClass(), "Timer");
     }
 
+    /**
+     * Static instantiator to get a handle of a service factory
+     * @return a simple service factory
+     */
     public static SimpleServiceFactory newInstance() {
         return new SimpleServiceFactory();
     }
@@ -59,18 +69,35 @@ public class SimpleServiceFactory implements ServiceFactory<Service<String, Stri
         throw new RuntimeException("This should not get executed");
     }
 
+    /**
+     * exposes the service created meter
+     * @return service created meter
+     */
     public Meter getServiceCreated() {
         return serviceCreated;
     }
 
+    /**
+     * exposes the service destroyed meter
+     * @return service destroyed meter
+     */
     public Meter getServiceDestroyed() {
         return serviceDestroyed;
     }
 
+    /**
+     * exposes the service timer meter
+     * @return service timer meter
+     */
     public Timer getServiceTimer() {
         return serviceTimer;
     }
 
+    /**
+     * Create a simple service wrapper as and when required by Service Cache
+     * @param hashFunction the hash function to use in the service
+     * @return a service wrapping the hash function
+     */
     private Service<String, String> createService(final HashFunction hashFunction) {
 
         return new Service<String, String>() {
