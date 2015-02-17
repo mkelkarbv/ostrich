@@ -2,22 +2,21 @@
 
 ## Objective
 
-The point of this performance test is to be able to recreate Ostrich performance problems that the 
- Concierge team ran into in Production. With the eventual aim of being able to fix those performance
- problems.
+The point of this performance test is to be able to recreate Ostrich performance problems observed in 
+ production, with the eventual aim of being able to fix those performance problems.
 
-Anecdotally, Concierge would run fine as long as the total number of requests-per-second to an Ostrich 
- service pool was low. As Concierge traffic went up, the Ostrich service pool traffic would went up, 
+Anecdotally, services would run fine as long as the total number of requests-per-second to an Ostrich 
+ service pool was low. As traffic increased, the Ostrich service pool traffic would went up, 
  and eventually the performance of the Ostrich based calls would degrade, sometimes catastrophically.
 
 This test has many parameters that can be adjusted
 
   * The requests-per-second to Ostrich
-  * What work the "Ostrich client" does for each request (stand in for the Concierge usecase of "Go run this ES query")
+  * What work the "Ostrich client" does for each request
   * Ostrich "pool" parameters (How and when Ostrich will make new Client objects)
 
-Note this test is specifically testing a "backend" component of Ostrich (the ServiceCache) that the Concierge 
- team identified as a problem.   This test is not testing Ostrich as a "whole" or as a black box.
+Note this test is specifically testing a "backend" component of Ostrich (the ServiceCache) that we've 
+ identified as a problem. This test is not testing Ostrich as a "whole" or as a black box.
 
 There should be a "black box" perf test for Ostrich in the future.   
 
@@ -31,13 +30,26 @@ A service cache is initialized with various parameters such as max number of ser
  before evicting a (wrapped) service instance, policy to  adhere upon cache is exhausted, etc. A detailed 
  breakdown of available parameters are provided in the Parameters section.
 
+## Notes on Compilation
+
+The suite also takes is a parameter "ostrich.core.version" at compile time to determine which version of 
+ ostrich core should be tested.
+
+    mvn -q clean compile assembly:single -Dostrich.core.version=1.9.0
+
+However, due to breaking changes between versions, i.e. 1.8 & 1.9 uses different version of metrics and
+ subsequently different constructor of ServiceCache, this `may' require you to make changes in the test 
+ for successful compilation.
+
+
 ## Running The Suite
 
 The test suite takes various parameters, such as to determine the load on the cache (# of threads), the load 
  on each thread, etc. to determine the overhead of ostrich under nominal to mediocre to somewhat heavy loads. 
- After determining and setting those desired values the suite will run the desired number of thread with 
+
+After determining and setting those desired values the suite will run the desired number of thread with 
  desired load and will monitor the health and performance of the cache.
- 
+
 ## Parameters
 
 ### Standard help/usage message 

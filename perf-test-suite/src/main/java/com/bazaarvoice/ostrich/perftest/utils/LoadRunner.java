@@ -149,7 +149,7 @@ public class LoadRunner {
             for (Thread t : workers) {
                 if (!t.isAlive()) done++;
             }
-            shouldContinue = !(done == total);
+            shouldContinue = (done != total);
         }
 
         if(!shouldContinue) {

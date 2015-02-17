@@ -46,6 +46,12 @@ public class SimpleServiceFactory implements ServiceFactory<Service<String, Stri
     @Override
     public void configure(ServicePoolBuilder<Service<String, String>> servicePoolBuilder) { }
 
+    /**
+     * Creates a service for a given service endpoint
+     *
+     * @param serviceEndPoint created with id of a random HashFunction
+     * @return a service instance
+     */
     @Override
     public Service<String, String> create(final ServiceEndPoint serviceEndPoint) {
         final HashFunction hashFunction = HashFunction.valueOf(serviceEndPoint.getId());

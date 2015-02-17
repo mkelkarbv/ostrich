@@ -16,6 +16,7 @@
     <version>0.1</version>
     <properties>
         <maven.deploy.skip>true</maven.deploy.skip>
+        <ostrich.core.version>${parent.version}</ostrich.core.version>
     </properties>
 
     <dependencies>
@@ -26,7 +27,7 @@
         <dependency>
             <groupId>com.bazaarvoice.ostrich</groupId>
             <artifactId>ostrich-core</artifactId>
-            <version>1.7.1</version>
+            <version>${ostrich.core.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>

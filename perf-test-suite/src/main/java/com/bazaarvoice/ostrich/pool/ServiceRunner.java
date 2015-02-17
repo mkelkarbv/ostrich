@@ -7,6 +7,7 @@ import com.bazaarvoice.ostrich.perftest.core.Result;
 import com.bazaarvoice.ostrich.perftest.core.ResultFactory;
 import com.bazaarvoice.ostrich.perftest.core.Service;
 import com.bazaarvoice.ostrich.perftest.utils.HashFunction;
+import com.codahale.metrics.MetricRegistry;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.yammer.metrics.Metrics;
@@ -38,7 +39,7 @@ public class ServiceRunner {
 
     /**
      * private constructor to prohibit instantiation
-     * @param builder
+     * @param builder for the service runner
      */
     private ServiceRunner(Builder builder) {
         _workSize = builder._workSize;
@@ -52,7 +53,7 @@ public class ServiceRunner {
                 .withMaxServiceInstanceIdleTime(builder._maxServiceIdleTimeSeconds, TimeUnit.SECONDS)
                 .build();
 
-        _serviceCache = new ServiceCache<>(_cachingPolicy, builder._serviceFactory);
+        _serviceCache = new ServiceCache<>(_cachingPolicy, builder._serviceFactory, new MetricRegistry());
 
         _serviceMeter = Metrics.newMeter(this.getClass(), "Succeeded", "succeeded", TimeUnit.SECONDS);
         _checkoutTimer = Metrics.newTimer(this.getClass(), "Checkout");
@@ -136,6 +137,13 @@ public class ServiceRunner {
      * static helpers
      */
 
+    /**
+     * Creates a service endpoint to hash a string with a given hash function
+     *
+     * @param hashFunction to delegate the work
+     * @param payload the string to hash
+     * @return an appropriate service endpoint for the job
+     */
     private static ServiceEndPoint buildServiceEndPoint(HashFunction hashFunction, String payload) {
         return new ServiceEndPointBuilder()
                 .withServiceName(hashFunction.name())
