@@ -6,17 +6,17 @@ The point of this performance test is to be able to recreate Ostrich performance
  production, with the eventual aim of being able to fix those performance problems.
 
 Anecdotally, services would run fine as long as the total number of requests-per-second to an Ostrich 
- service pool was low. As traffic increased, the Ostrich service pool traffic would went up, 
- and eventually the performance of the Ostrich based calls would degrade, sometimes catastrophically.
+ service pool was low. As the requests per second to the Ostrich Service Pool increased, the performance
+ of Ostrich would degrade, sometimes catastrophically.
 
 This test has many parameters that can be adjusted
 
   * The requests-per-second to Ostrich
   * What work the "Ostrich client" does for each request
-  * Ostrich "pool" parameters (How and when Ostrich will make new Client objects)
+  * Ostrich "pool" parameters (How and when Ostrich will request new Client Objects for each Endpoint)
 
 Note this test is specifically testing a "backend" component of Ostrich (the ServiceCache) that we've 
- identified as a problem. This test is not testing Ostrich as a "whole" or as a black box.
+ identified as a problem. This does not test Ostrich as a whole
 
 There should be a "black box" perf test for Ostrich in the future.   
 
@@ -38,14 +38,15 @@ The suite also takes is a parameter "ostrich.core.version" at compile time to de
     mvn -q clean compile assembly:single -Dostrich.core.version=1.9.0
 
 However, due to breaking changes between versions, i.e. 1.8 & 1.9 uses different version of metrics and
- subsequently different constructor of ServiceCache, this `may' require you to make changes in the test 
+ subsequently different constructor of ServiceCache, this 'may' require you to make changes in the test 
  for successful compilation.
 
 
 ## Running The Suite
 
-The test suite takes various parameters, such as to determine the load on the cache (# of threads), the load 
- on each thread, etc. to determine the overhead of ostrich under nominal to mediocre to somewhat heavy loads. 
+To determine the performance overhead of Ostrich under varying loads, this test suite takes various parameters 
+ such as, to determine the load on the cache (# of threads), the load on each thread, etc. to determine the 
+ overhead of ostrich under nominal to mediocre to somewhat heavy loads. 
 
 After determining and setting those desired values the suite will run the desired number of thread with 
  desired load and will monitor the health and performance of the cache.
@@ -75,7 +76,7 @@ After determining and setting those desired values the suite will run the desire
       -w,--work-size <arg>        length of the string to generate randomly and
                                   crunch hash, default is 5120 (5kb)
 
-### Other parameters
+### I/O and runtime parameters
 
       -o,--output-file <arg>      Output file to use instead of STDOUT
 
@@ -88,6 +89,16 @@ After determining and setting those desired values the suite will run the desire
 
       -v,--report-every <arg>     Reports the running statistics every #
                                   seconds
+
+### Recommended JVM parameters
+
+      -Xms2048m                   Allocate enough heap space such that it does not
+                                  ran out of memory
+                                  2GB of more is recommended 
+
+      -Djava.compiler=NONE        Disable JIT compiler to keep things consistent
+                                  This will avoid surprise optimization and as a
+                                  result consequent performance gain
 
 
 ## Interpreting the results
@@ -177,18 +188,18 @@ This creates a shaded jar called test-suite-<VERSION>-jar-with-dependencies.jar 
 
 #### For the following configuration:
 
-    - Heap size: 2GB (or more, based on how many threads you want to run)
+    - Heap size: 2GB (or more, based on how many threads you want to run), JIT disabled
     - threads: 25, work size: 12000Bytes
     - cache idle time: 10 seconds, cache max instance per service: 10, cache exhaust action: GROW
     - print statistics, output ot file output.csv, report every 5 second, run for 30 second 
 
 #### The command would be:
 
-    java -Xms2048m -jar test-suite-<VERSION>-jar-with-dependencies.jar \
+    java -Djava.compiler=NONE -Xms2048m -jar test-suite-<VERSION>-jar-with-dependencies.jar \
     --thread-size 25 --work-size 12000 \
     --idle-time 10 --max-instances 10 --exhaust-action GROW \
     --statistics --report-every 5 --run-time 30 --output-file output.csv
 
 Or
 
-    java -Xms2048m -jar test-suite-<VERSION>-jar-with-dependencies.jar -t 25 -w 12000 -i 10 -m 10 -e GROW -s -v 5 -r 30 -o output.csv
+    java -Djava.compiler=NONE -Xms2048m -jar test-suite-<VERSION>-jar-with-dependencies.jar -t 25 -w 12000 -i 10 -m 10 -e GROW -s -v 5 -r 30 -o output.csv

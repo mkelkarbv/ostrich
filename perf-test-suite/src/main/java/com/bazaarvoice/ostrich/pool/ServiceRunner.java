@@ -55,7 +55,7 @@ public class ServiceRunner {
 
         _serviceCache = new ServiceCache<>(_cachingPolicy, builder._serviceFactory, new MetricRegistry());
 
-        _serviceMeter = Metrics.newMeter(this.getClass(), "Succeeded", "succeeded", TimeUnit.SECONDS);
+        _serviceMeter = Metrics.newMeter(this.getClass(), "Executed", "executed", TimeUnit.SECONDS);
         _checkoutTimer = Metrics.newTimer(this.getClass(), "Checkout");
         _checkinTimer = Metrics.newTimer(this.getClass(), "Checkin");
         _totalExecTimer = Metrics.newTimer(this.getClass(), "Total");
@@ -77,6 +77,13 @@ public class ServiceRunner {
         return _totalExecTimer;
     }
 
+    /**
+     * Generates worker threads that will make requests of the ServiceCache.
+     * Each worker thread will request a "Client" from the ServiceCache, and
+     * when it has a client will do some "busywork". The "busywork" will be
+     * to run some cryptographic hashes across a random string.
+     * The size of the random String to be hashed can be configured from the command line.
+     */
     public List<Thread> generateWorkers() {
 
         ImmutableList.Builder<Thread> threadListBuilder = ImmutableList.builder();
@@ -120,15 +127,13 @@ public class ServiceRunner {
             _serviceCache.checkIn(serviceHandle);
             checkinTimeContext.stop();
 
-            _serviceMeter.mark();
-            totalTimeContext.stop();
-
             return _resultFactory.createResponse(result);
         } catch (Exception exception) {
+            return _resultFactory.createResponse(exception);
+        }
+        finally {
             _serviceMeter.mark();
             totalTimeContext.stop();
-
-            return _resultFactory.createResponse(exception);
         }
     }
 
