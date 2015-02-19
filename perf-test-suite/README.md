@@ -32,7 +32,7 @@ A service cache is initialized with various parameters such as max number of ser
 
 ## Notes on Compilation
 
-The suite also takes is a parameter "ostrich.core.version" at compile time to determine which version of 
+The suite also takes in a parameter "ostrich.core.version" at compile time to determine which version of 
  ostrich core should be tested.
 
     mvn -q clean compile assembly:single -Dostrich.core.version=1.9.0
@@ -44,12 +44,13 @@ However, due to breaking changes between versions, i.e. 1.8 & 1.9 uses different
 
 ## Running The Suite
 
-To determine the performance overhead of Ostrich under varying loads, this test suite takes various parameters 
- such as, to determine the load on the cache (# of threads), the load on each thread, etc. to determine the 
- overhead of ostrich under nominal to mediocre to somewhat heavy loads. 
+To determine the performance of Ostrich under varying loads, this test suite takes various parameters. They 
+ allow us to set the load on the cache, i.e. # of worker threads using the cache, the load on each thread,
+ i.e. how much work each worker thread must do, etc. These help us to determine the overhead of ostrich 
+ under nominal to mediocre to somewhat heavy loads. 
 
-After determining and setting those desired values the suite will run the desired number of thread with 
- desired load and will monitor the health and performance of the cache.
+After determining and setting those desired values the suite will run the desired number of threads and
+ load, and will monitor the health and performance of the cache.
 
 ## Parameters
 
