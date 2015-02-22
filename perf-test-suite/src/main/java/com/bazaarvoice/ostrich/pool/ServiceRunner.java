@@ -3,17 +3,17 @@ package com.bazaarvoice.ostrich.pool;
 import com.bazaarvoice.ostrich.ServiceEndPoint;
 import com.bazaarvoice.ostrich.ServiceEndPointBuilder;
 import com.bazaarvoice.ostrich.ServiceFactory;
+import com.bazaarvoice.ostrich.metrics.Metrics;
 import com.bazaarvoice.ostrich.perftest.core.Result;
 import com.bazaarvoice.ostrich.perftest.core.ResultFactory;
 import com.bazaarvoice.ostrich.perftest.core.Service;
+import com.bazaarvoice.ostrich.perftest.core.SimpleResultFactory;
+import com.bazaarvoice.ostrich.perftest.utils.Arguments;
 import com.bazaarvoice.ostrich.perftest.utils.HashFunction;
+import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
-import com.google.common.base.Preconditions;
+import com.codahale.metrics.Timer;
 import com.google.common.collect.ImmutableList;
-import com.yammer.metrics.Metrics;
-import com.yammer.metrics.core.Meter;
-import com.yammer.metrics.core.Timer;
-import com.yammer.metrics.core.TimerContext;
 import org.apache.commons.lang3.RandomStringUtils;
 
 import java.util.List;
@@ -37,28 +37,28 @@ public class ServiceRunner {
     private final Timer _checkinTimer;
     private final Timer _totalExecTimer;
 
-    /**
-     * private constructor to prohibit instantiation
-     * @param builder for the service runner
-     */
-    private ServiceRunner(Builder builder) {
-        _workSize = builder._workSize;
-        _threadSize = builder._threadSize;
 
-        _resultFactory = builder._resultFactory;
+    /**
+     * @param serviceFactory the service factory
+     * @param arguments      the command line arguments
+     */
+    public ServiceRunner(ServiceFactory<Service<String, String>> serviceFactory, MetricRegistry metricRegistry, Arguments arguments) {
+        _workSize = arguments.getWorkSize();
+        _threadSize = arguments.getThreadSize();
+        _resultFactory = SimpleResultFactory.newInstance();
 
         ServiceCachingPolicy _cachingPolicy = new ServiceCachingPolicyBuilder()
-                .withCacheExhaustionAction(builder._exhaustionAction)
-                .withMaxNumServiceInstancesPerEndPoint(builder._maxServiceInstances)
-                .withMaxServiceInstanceIdleTime(builder._maxServiceIdleTimeSeconds, TimeUnit.SECONDS)
+                .withCacheExhaustionAction(arguments.getExhaustionAction())
+                .withMaxNumServiceInstancesPerEndPoint(arguments.getMaxInstance())
+                .withMaxServiceInstanceIdleTime(arguments.getIdleTimeSecond(), TimeUnit.SECONDS)
                 .build();
+        _serviceCache = new ServiceCache<>(_cachingPolicy, serviceFactory, new MetricRegistry());
 
-        _serviceCache = new ServiceCache<>(_cachingPolicy, builder._serviceFactory, new MetricRegistry());
-
-        _serviceMeter = Metrics.newMeter(this.getClass(), "Executed", "executed", TimeUnit.SECONDS);
-        _checkoutTimer = Metrics.newTimer(this.getClass(), "Checkout");
-        _checkinTimer = Metrics.newTimer(this.getClass(), "Checkin");
-        _totalExecTimer = Metrics.newTimer(this.getClass(), "Total");
+        Metrics.InstanceMetrics _metrics = Metrics.forInstance(metricRegistry, this, "ServiceRunner");
+        _serviceMeter = _metrics.meter("Executed");
+        _checkoutTimer = _metrics.timer("Checkout");
+        _checkinTimer = _metrics.timer("Checkin");
+        _totalExecTimer = _metrics.timer("Total");
     }
 
     public Meter getServiceMeter() {
@@ -107,15 +107,10 @@ public class ServiceRunner {
         return threadListBuilder.build();
     }
 
-
-    /**
-     * private helpers
-     */
-
     private Result<String> serviceExecution(ServiceEndPoint serviceEndPoint) {
-        TimerContext totalTimeContext = _totalExecTimer.time();
+        Timer.Context totalTimeContext = _totalExecTimer.time();
         try {
-            TimerContext checkoutTimeContext = _checkoutTimer.time();
+            Timer.Context checkoutTimeContext = _checkoutTimer.time();
             ServiceHandle<Service<String, String>> serviceHandle = _serviceCache.checkOut(serviceEndPoint);
             Service<String, String> service = serviceHandle.getService();
             checkoutTimeContext.stop();
@@ -123,7 +118,7 @@ public class ServiceRunner {
             String work = serviceEndPoint.getPayload();
             String result = service.process(work);
 
-            TimerContext checkinTimeContext = _checkinTimer.time();
+            Timer.Context checkinTimeContext = _checkinTimer.time();
             _serviceCache.checkIn(serviceHandle);
             checkinTimeContext.stop();
 
@@ -136,11 +131,6 @@ public class ServiceRunner {
             totalTimeContext.stop();
         }
     }
-
-
-    /**
-     * static helpers
-     */
 
     /**
      * Creates a service endpoint to hash a string with a given hash function
@@ -155,73 +145,5 @@ public class ServiceRunner {
                 .withId(hashFunction.name())
                 .withPayload(payload)
                 .build();
-    }
-
-    /**
-     * Builder
-     */
-
-    public static Builder builder() {
-        return new Builder();
-    }
-
-    public static final class Builder {
-        private Integer _workSize;
-        private Integer _threadSize;
-        private ServiceCachingPolicy.ExhaustionAction _exhaustionAction;
-        private Integer _maxServiceInstances;
-        private Integer _maxServiceIdleTimeSeconds;
-        private ResultFactory<String> _resultFactory;
-        private ServiceFactory<Service<String, String>> _serviceFactory;
-
-        private Builder() {
-        }
-
-        public Builder withWorkSize(int workSize) {
-            this._workSize = workSize;
-            return this;
-        }
-
-        public Builder withThreadSize(int threadSize) {
-            this._threadSize = threadSize;
-            return this;
-        }
-
-        public Builder withExhaustionAction(ServiceCachingPolicy.ExhaustionAction exhaustionAction) {
-            this._exhaustionAction = exhaustionAction;
-            return this;
-        }
-
-        public Builder withMaxServiceInstances(int maxServiceInstances) {
-            this._maxServiceInstances = maxServiceInstances;
-            return this;
-        }
-
-        public Builder withMaxServiceIdleTimeSeconds(int maxServiceIdleTimeSeconds) {
-            this._maxServiceIdleTimeSeconds = maxServiceIdleTimeSeconds;
-            return this;
-        }
-
-        public Builder withServiceFactory(ServiceFactory<Service<String, String>> serviceFactory) {
-            this._serviceFactory = serviceFactory;
-            return this;
-        }
-
-        public Builder withResultFactory(ResultFactory<String> resultFactory) {
-            this._resultFactory = resultFactory;
-            return this;
-        }
-
-        public ServiceRunner build() {
-            Preconditions.checkNotNull(_workSize);
-            Preconditions.checkNotNull(_threadSize);
-            Preconditions.checkNotNull(_exhaustionAction);
-            Preconditions.checkNotNull(_maxServiceInstances);
-            Preconditions.checkNotNull(_maxServiceIdleTimeSeconds);
-            Preconditions.checkNotNull(_serviceFactory);
-            Preconditions.checkNotNull(_resultFactory);
-
-            return new ServiceRunner(this);
-        }
     }
 }

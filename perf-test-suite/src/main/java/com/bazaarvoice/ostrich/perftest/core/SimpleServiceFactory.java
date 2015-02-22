@@ -2,40 +2,39 @@ package com.bazaarvoice.ostrich.perftest.core;
 
 import com.bazaarvoice.ostrich.ServiceEndPoint;
 import com.bazaarvoice.ostrich.ServiceFactory;
+import com.bazaarvoice.ostrich.metrics.Metrics;
 import com.bazaarvoice.ostrich.perftest.utils.HashFunction;
 import com.bazaarvoice.ostrich.pool.ServicePoolBuilder;
-import com.yammer.metrics.Metrics;
-import com.yammer.metrics.core.Meter;
-import com.yammer.metrics.core.Timer;
-import com.yammer.metrics.core.TimerContext;
-
-import java.util.concurrent.TimeUnit;
+import com.codahale.metrics.Meter;
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.Timer;
 
 /**
  * A service factory, as needed in the ServiceCache
  */
 public class SimpleServiceFactory implements ServiceFactory<Service<String, String>> {
 
-    private final Meter serviceCreated;
-    private final Meter serviceDestroyed;
-    private final Timer serviceTimer;
+    private final Meter _serviceCreated;
+    private final Meter _serviceDestroyed;
+    private final Timer _serviceTimer;
 
 
     /**
      * private constructor
      */
-    private SimpleServiceFactory() {
-        serviceCreated = Metrics.newMeter(this.getClass(), "Created", "created", TimeUnit.SECONDS);
-        serviceDestroyed = Metrics.newMeter(this.getClass(), "Destroyed", "destroyed", TimeUnit.SECONDS);
-        serviceTimer = Metrics.newTimer(this.getClass(), "Timer");
+    private SimpleServiceFactory(MetricRegistry metricRegistry) {
+        Metrics.InstanceMetrics instanceMetrics = Metrics.forInstance(metricRegistry, this, "ServiceFactory");
+        _serviceCreated = instanceMetrics.meter("Created");
+        _serviceDestroyed = instanceMetrics.meter("Destroyed");
+        _serviceTimer = instanceMetrics.timer("Timer");
     }
 
     /**
      * Static instantiator to get a handle of a service factory
      * @return a simple service factory
      */
-    public static SimpleServiceFactory newInstance() {
-        return new SimpleServiceFactory();
+    public static SimpleServiceFactory newInstance(MetricRegistry metricRegistry) {
+        return new SimpleServiceFactory(metricRegistry);
     }
 
     @Override
@@ -67,12 +66,12 @@ public class SimpleServiceFactory implements ServiceFactory<Service<String, Stri
 
     @Override
     public boolean isHealthy(ServiceEndPoint endPoint) {
-        throw new RuntimeException("This should not get executed");
+        throw new RuntimeException("isHealthy() should not get executed as part the performance test suite");
     }
 
     @Override
     public boolean isRetriableException(Exception exception) {
-        throw new RuntimeException("This should not get executed");
+        throw new RuntimeException("isRetriableException() should not get executed as part the performance test suite");
     }
 
     /**
@@ -80,7 +79,7 @@ public class SimpleServiceFactory implements ServiceFactory<Service<String, Stri
      * @return service created meter
      */
     public Meter getServiceCreated() {
-        return serviceCreated;
+        return _serviceCreated;
     }
 
     /**
@@ -88,7 +87,7 @@ public class SimpleServiceFactory implements ServiceFactory<Service<String, Stri
      * @return service destroyed meter
      */
     public Meter getServiceDestroyed() {
-        return serviceDestroyed;
+        return _serviceDestroyed;
     }
 
     /**
@@ -96,7 +95,7 @@ public class SimpleServiceFactory implements ServiceFactory<Service<String, Stri
      * @return service timer meter
      */
     public Timer getServiceTimer() {
-        return serviceTimer;
+        return _serviceTimer;
     }
 
     /**
@@ -110,7 +109,7 @@ public class SimpleServiceFactory implements ServiceFactory<Service<String, Stri
 
             @Override
             public String process(String work) {
-                TimerContext serviceTime = serviceTimer.time();
+                Timer.Context serviceTime = _serviceTimer.time();
                 String result = hashFunction.process(work);
                 serviceTime.stop();
                 return result;
@@ -118,12 +117,12 @@ public class SimpleServiceFactory implements ServiceFactory<Service<String, Stri
 
             @Override
             public void initialize() {
-                serviceCreated.mark();
+                _serviceCreated.mark();
             }
 
             @Override
             public void destroy() {
-                serviceDestroyed.mark();
+                _serviceDestroyed.mark();
             }
         };
     }
