@@ -31,6 +31,7 @@ public class SimpleServiceFactory implements ServiceFactory<Service<String, Stri
 
     /**
      * Static instantiator to get a handle of a service factory
+     *
      * @return a simple service factory
      */
     public static SimpleServiceFactory newInstance(MetricRegistry metricRegistry) {
@@ -43,7 +44,8 @@ public class SimpleServiceFactory implements ServiceFactory<Service<String, Stri
     }
 
     @Override
-    public void configure(ServicePoolBuilder<Service<String, String>> servicePoolBuilder) { }
+    public void configure(ServicePoolBuilder<Service<String, String>> servicePoolBuilder) {
+    }
 
     /**
      * Creates a service for a given service endpoint
@@ -76,6 +78,7 @@ public class SimpleServiceFactory implements ServiceFactory<Service<String, Stri
 
     /**
      * exposes the service created meter
+     *
      * @return service created meter
      */
     public Meter getServiceCreated() {
@@ -84,6 +87,7 @@ public class SimpleServiceFactory implements ServiceFactory<Service<String, Stri
 
     /**
      * exposes the service destroyed meter
+     *
      * @return service destroyed meter
      */
     public Meter getServiceDestroyed() {
@@ -92,6 +96,7 @@ public class SimpleServiceFactory implements ServiceFactory<Service<String, Stri
 
     /**
      * exposes the service timer meter
+     *
      * @return service timer meter
      */
     public Timer getServiceTimer() {
@@ -100,6 +105,7 @@ public class SimpleServiceFactory implements ServiceFactory<Service<String, Stri
 
     /**
      * Create a simple service wrapper as and when required by Service Cache
+     *
      * @param hashFunction the hash function to use in the service
      * @return a service wrapping the hash function
      */

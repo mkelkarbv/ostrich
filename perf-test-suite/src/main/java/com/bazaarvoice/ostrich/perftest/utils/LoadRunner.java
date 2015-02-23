@@ -183,7 +183,8 @@ public class LoadRunner {
 
         try {
             Thread.sleep(TimeUnit.SECONDS.toMillis(_reportingIntervalSeconds));
-        } catch(InterruptedException ignored) {}
+        } catch (InterruptedException ignored) {
+        }
     }
 
     public void printHeaders() {
@@ -209,7 +210,8 @@ public class LoadRunner {
                     try {
                         t.interrupt();
                         t.join();
-                    } catch (InterruptedException ignored) { }
+                    } catch (InterruptedException ignored) {
+                    }
                 }
             }
             shouldContinue = false;
@@ -217,12 +219,14 @@ public class LoadRunner {
             int total = _workers.size();
             int done = 0;
             for (Thread t : _workers) {
-                if (!t.isAlive()) done++;
+                if (!t.isAlive()) {
+                    done++;
+                }
             }
             shouldContinue = (done != total);
         }
 
-        if(!shouldContinue) {
+        if (!shouldContinue) {
             _out.close();
         }
         return shouldContinue;
@@ -234,6 +238,6 @@ public class LoadRunner {
 
     // Snapshot returns times in NS, this converts them to ms as we need
     private double nsToMs(double ns) {
-        return ns/1000000;
+        return ns / 1000000;
     }
 }

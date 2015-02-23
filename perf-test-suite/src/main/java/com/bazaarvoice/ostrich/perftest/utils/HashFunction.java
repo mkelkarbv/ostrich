@@ -44,12 +44,12 @@ public enum HashFunction {
             return DigestUtils.md5Hex(work);
         }
     };
-
-    public abstract String process(String work);
-
     private static final int RANDOM_HASH_FUNCTION_LIMIT = HashFunction.values().length;
     private static final Random RANDOM = new Random();
+
     public static HashFunction getRandomHashFunction() {
         return HashFunction.values()[RANDOM.nextInt(RANDOM_HASH_FUNCTION_LIMIT)];
     }
+
+    public abstract String process(String work);
 }

@@ -13,6 +13,6 @@ public class Main {
         loadRunner.printHeaders();
         do {
             loadRunner.printLog();
-        } while(loadRunner.shouldContinue());
+        } while (loadRunner.shouldContinue());
     }
 }

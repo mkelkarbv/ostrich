@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * This needs to be in the com.bazaarvoice.ostrich.pool package so that it can have direct access to ServiceCache
- *
+ * <p/>
  * This instantiates a service cache, creates threads to run test on and exposes various metrics for monitoring
  */
 @SuppressWarnings ("deprecation")
@@ -59,6 +59,21 @@ public class ServiceRunner {
         _checkoutTimer = _metrics.timer("Checkout");
         _checkinTimer = _metrics.timer("Checkin");
         _totalExecTimer = _metrics.timer("Total");
+    }
+
+    /**
+     * Creates a service endpoint to hash a string with a given hash function
+     *
+     * @param hashFunction to delegate the work
+     * @param payload      the string to hash
+     * @return an appropriate service endpoint for the job
+     */
+    private static ServiceEndPoint buildServiceEndPoint(HashFunction hashFunction, String payload) {
+        return new ServiceEndPointBuilder()
+                .withServiceName(hashFunction.name())
+                .withId(hashFunction.name())
+                .withPayload(payload)
+                .build();
     }
 
     public Meter getServiceMeter() {
@@ -125,25 +140,9 @@ public class ServiceRunner {
             return _resultFactory.createResponse(result);
         } catch (Exception exception) {
             return _resultFactory.createResponse(exception);
-        }
-        finally {
+        } finally {
             _serviceMeter.mark();
             totalTimeContext.stop();
         }
-    }
-
-    /**
-     * Creates a service endpoint to hash a string with a given hash function
-     *
-     * @param hashFunction to delegate the work
-     * @param payload the string to hash
-     * @return an appropriate service endpoint for the job
-     */
-    private static ServiceEndPoint buildServiceEndPoint(HashFunction hashFunction, String payload) {
-        return new ServiceEndPointBuilder()
-                .withServiceName(hashFunction.name())
-                .withId(hashFunction.name())
-                .withPayload(payload)
-                .build();
     }
 }

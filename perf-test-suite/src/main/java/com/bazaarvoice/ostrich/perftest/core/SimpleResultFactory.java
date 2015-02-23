@@ -2,7 +2,8 @@ package com.bazaarvoice.ostrich.perftest.core;
 
 public class SimpleResultFactory implements ResultFactory<String> {
 
-    private SimpleResultFactory() {}
+    private SimpleResultFactory() {
+    }
 
     public static SimpleResultFactory newInstance() {
         return new SimpleResultFactory();

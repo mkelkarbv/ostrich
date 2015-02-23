@@ -97,7 +97,7 @@ public class Arguments {
             CommandLineParser commandLineParser = new BasicParser();
             CommandLine commandLine = commandLineParser.parse(options, args);
 
-            if(commandLine.hasOption("h")) {
+            if (commandLine.hasOption("h")) {
                 help(options);
             }
 
@@ -141,12 +141,10 @@ public class Arguments {
 
                 throw new Exception("Cannot print both report log and statistics to STDOUT at the same time");
             }
-        }
-        catch(IllegalArgumentException ex) {
+        } catch (IllegalArgumentException ex) {
             printError(opt, longOpt, value);
             help(options);
-        }
-        catch(Exception ex) {
+        } catch (Exception ex) {
             printError(ex, opt, longOpt, value);
             help(options);
         }
@@ -159,7 +157,7 @@ public class Arguments {
     }
 
     private void printError(String opt, String longOpt, String value) {
-        if(!Strings.isNullOrEmpty(opt) && !Strings.isNullOrEmpty(value)) {
+        if (!Strings.isNullOrEmpty(opt) && !Strings.isNullOrEmpty(value)) {
             System.err.println(String.format("\"%s\" is not valid value for -%s / --%s", value, opt, longOpt));
         }
     }
@@ -169,7 +167,8 @@ public class Arguments {
         printError(opt, longOpt, value);
     }
 
-    private PrintStream createPrintStream(String filePath) throws Exception {
+    private PrintStream createPrintStream(String filePath)
+            throws Exception {
         File file = new File(filePath);
         if (!file.createNewFile()) {
             throw new Exception("Cannot create file: " + filePath);
