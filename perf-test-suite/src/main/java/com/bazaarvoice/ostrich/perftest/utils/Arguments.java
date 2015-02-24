@@ -25,10 +25,13 @@ public class Arguments {
     private long _runTimeSecond = Long.MAX_VALUE;
     private int _maxInstance = 10;
     private int _idleTimeSecond = 10;
+    private boolean _runSingletonMode = false;
     private ExhaustionAction _exhaustionAction = ExhaustionAction.WAIT;
     private int _reportingIntervalSeconds = 1;
     private PrintStream _output = System.out;
     private boolean _printStats = false;
+    private int _chaosWorkers = 2;
+    private int _chaosInterval = 15;
 
 
     public Arguments(String[] args) {
@@ -71,6 +74,18 @@ public class Arguments {
         return _reportingIntervalSeconds;
     }
 
+    public boolean isRunSingletonMode() {
+        return _runSingletonMode;
+    }
+
+    public int getChaosWorkers() {
+        return _chaosWorkers;
+    }
+
+    public int getChaosInterval() {
+        return _chaosInterval;
+    }
+
     private void parseArgs(String[] args) {
 
         Options options = new Options();
@@ -84,6 +99,11 @@ public class Arguments {
         options.addOption("m", "max-instances", true, "Max instances per end point in service cache, default is 10");
         options.addOption("i", "idle-time", true, "Idle time before service cache should take evict action, default is 10");
         options.addOption("e", "exhaust-action", true, "Exhaust action when cache is exhausted, acceptable values are WAIT|FAIL|GROW, default is WAIT");
+
+        options.addOption("g", "singleton-mode", false, "Run with singleton policy mode, default is false");
+
+        options.addOption("c", "chaos-count", true, "Number of chaos workers to use, default is 2");
+        options.addOption("l", "chaos-interval", true, "time (in seconds) to wait between chaos, default is 15");
 
         options.addOption("o", "output-file", true, "Output file to use instead of STDOUT");
         options.addOption("v", "report-every", true, "Reports the running statistics every # seconds");
@@ -129,16 +149,24 @@ public class Arguments {
                     case "o":
                         _output = createPrintStream(value);
                         break;
+                    case "g":
+                        _runSingletonMode = true;
+                        break;
                     case "s":
                         _printStats = true;
                         break;
                     case "v":
                         _reportingIntervalSeconds = Integer.parseInt(value);
                         break;
+                    case "c":
+                        _chaosWorkers = Integer.parseInt(value);
+                        break;
+                    case "l":
+                        _chaosInterval = Integer.parseInt(value);
+                        break;
                 }
             }
             if (_output == System.out && _printStats) {
-
                 throw new Exception("Cannot print both report log and statistics to STDOUT at the same time");
             }
         } catch (IllegalArgumentException ex) {

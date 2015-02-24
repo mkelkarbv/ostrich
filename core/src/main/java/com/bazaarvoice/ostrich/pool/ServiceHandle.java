@@ -17,7 +17,7 @@ class ServiceHandle<S> {
         return _service;
     }
 
-    ServiceEndPoint getEndPoint() {
+    public ServiceEndPoint getEndPoint() {
         return _endPoint;
     }
 }
