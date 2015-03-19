@@ -51,4 +51,13 @@ public interface ServiceCachingPolicy {
         /** Wait until an instance is returned to the cache when at the limit of the number of allowed instances. */
         WAIT
     }
+
+    /**
+     * This defaults to false, i.e. the default policy is to support a ServiceCache of single threaded clients.
+     *
+     * If this is set to true, all other params are ignored, and their getters throws unsupported operation exception
+     *
+     * @return true if policy is intended for multi threaded clients
+     */
+    boolean useMultiThreadedClientPolicy();
 }

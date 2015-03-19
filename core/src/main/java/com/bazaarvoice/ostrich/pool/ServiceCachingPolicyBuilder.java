@@ -13,6 +13,49 @@ public class ServiceCachingPolicyBuilder {
             .withCacheExhaustionAction(ExhaustionAction.GROW)
             .build();
 
+    /**
+     * Creates a ServiceCachingPolicy configured for multi threaded client strategy,
+     * the {@link com.bazaarvoice.ostrich.pool.MultiThreadedClientServiceCache}
+     * <p/>
+     * This policy returns true for useMultiThreadedClientPolicy() but throws
+     * {@link java.lang.UnsupportedOperationException} for everything else
+     *
+     */
+    private static final ServiceCachingPolicy DEFAULT_MULTI_THREADED_CLIENTS_POLICY = new ServiceCachingPolicy() {
+        @Override
+        public int getMaxNumServiceInstances() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int getMaxNumServiceInstancesPerEndPoint() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public long getMaxServiceInstanceIdleTime(TimeUnit unit) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ExhaustionAction getCacheExhaustionAction() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean useMultiThreadedClientPolicy() {
+            return true;
+        }
+    };
+
+    /**
+     *
+     * @return ServiceCachingPolicy configured to build a {@code MultiThreadedClientServiceCache}
+     */
+    public static ServiceCachingPolicy getMultiThreadedClientPolicy() {
+        return DEFAULT_MULTI_THREADED_CLIENTS_POLICY;
+    }
+
     private int _maxNumServiceInstances = -1;
     private int _maxNumServiceInstancesPerEndPoint = -1;
     private long _maxServiceInstanceIdleTimeNanos;
@@ -110,6 +153,11 @@ public class ServiceCachingPolicyBuilder {
             @Override
             public ExhaustionAction getCacheExhaustionAction() {
                 return cacheExhaustionAction;
+            }
+
+            @Override
+            public boolean useMultiThreadedClientPolicy() {
+                return false;
             }
         };
     }
