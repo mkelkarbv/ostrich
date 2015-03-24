@@ -30,18 +30,6 @@ A service cache is initialized with various parameters such as max number of ser
  before evicting a (wrapped) service instance, policy to  adhere upon cache is exhausted, etc. A detailed 
  breakdown of available parameters are provided in the Parameters section.
 
-## Notes on Compilation
-
-The suite also takes in a parameter "ostrich.core.version" at compile time to determine which version of 
- ostrich core should be tested.
-
-    mvn -q clean compile assembly:single -Dostrich.core.version=1.9.0
-
-However, due to breaking changes between versions, i.e. 1.8 & 1.9 uses different version of metrics and
- subsequently different constructor of ServiceCache, this 'may' require you to make changes in the test 
- for successful compilation.
-
-
 ## Running The Suite
 
 To determine the performance of Ostrich under varying loads, this test suite takes various parameters. They 
