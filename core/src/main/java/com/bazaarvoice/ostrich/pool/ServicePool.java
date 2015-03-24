@@ -92,7 +92,10 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
                 .<ServiceEndPoint, Boolean>build()
                 .asMap());
         checkNotNull(cachingPolicy);
-        _serviceCache = new ServiceCache<S>(cachingPolicy, serviceFactory);
+        _serviceCache = new ServiceCacheBuilder<S>()
+                .withServiceFactory(serviceFactory)
+                .withCachingPolicy(cachingPolicy)
+                .build();
         _partitionFilter = checkNotNull(partitionFilter);
         _loadBalanceAlgorithm = checkNotNull(loadBalanceAlgorithm);
 
@@ -169,6 +172,7 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
             }
         }
 
+        _serviceCache.close();
         _metrics.close();
 
         if (_shutdownHealthCheckExecutorOnClose) {
@@ -402,6 +406,7 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
     }
 
     private synchronized void addEndPoint(ServiceEndPoint endPoint) {
+        _serviceCache.register(endPoint);
         _recentlyRemovedEndPoints.remove(endPoint);
         _badEndPoints.remove(endPoint);
         LOG.debug("End point added to service pool. End point ID: {}", endPoint.getId());
