@@ -113,6 +113,5 @@
         <module>dropwizard</module>
         <module>zookeeper</module>
         <module>examples</module>
-        <module>perf-test-suite</module>
     </modules>
 </project>
