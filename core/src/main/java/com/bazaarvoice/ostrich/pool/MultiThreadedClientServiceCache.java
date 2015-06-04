@@ -39,7 +39,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  *
  * @param <S> the Service type
  */
-public class MultiThreadedClientServiceCache<S> implements ServiceCache<S> {
+class MultiThreadedClientServiceCache<S> implements ServiceCache<S> {
     private static final Logger LOG = LoggerFactory.getLogger(MultiThreadedClientServiceCache.class);
 
     // Grace period during which a new service instance will not be replaced by subsequent registrations
@@ -140,9 +140,8 @@ public class MultiThreadedClientServiceCache<S> implements ServiceCache<S> {
 
         _metrics = Metrics.forInstance(this, serviceName);
         _registerTimer = _metrics.newTimer(serviceName, "register-time", TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
-
         _evictionTimer = _metrics.newTimer(serviceName, "eviction-time", TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
-        _serviceCounter = _metrics.newCounter("service-counter", serviceName);
+        _serviceCounter = _metrics.newCounter(serviceName, "service-counter");
 
         _cleanupFuture = _cleanupExecutor.scheduleAtFixedRate(
                 new Runnable() {
@@ -227,6 +226,7 @@ public class MultiThreadedClientServiceCache<S> implements ServiceCache<S> {
      */
     private ServiceHandle<S> doRegister(ServiceEndPoint endPoint) {
         checkNotNull(endPoint);
+        TimerContext context = _registerTimer.time();
 
         ServiceHandle<S> toDelete = null;
         ServiceHandle<S> toReturn;
@@ -276,6 +276,7 @@ public class MultiThreadedClientServiceCache<S> implements ServiceCache<S> {
             _serviceCounter.dec();
         }
 
+        context.stop();
         return toReturn;
     }
 
@@ -283,13 +284,10 @@ public class MultiThreadedClientServiceCache<S> implements ServiceCache<S> {
     public void register(ServiceEndPoint endPoint) {
         checkNotNull(endPoint);
 
-        TimerContext context = _registerTimer.time();
         try {
             doRegister(endPoint);
         } catch (Exception ex) {
             LOG.error("Error registering service handle", ex);
-        } finally {
-            context.stop();
         }
     }
 
