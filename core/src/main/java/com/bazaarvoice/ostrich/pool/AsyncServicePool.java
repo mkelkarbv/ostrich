@@ -12,7 +12,6 @@ import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
-import com.google.common.base.Stopwatch;
 import com.google.common.base.Ticker;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -122,7 +121,7 @@ class AsyncServicePool<S> implements com.bazaarvoice.ostrich.AsyncServicePool<S>
                 @Override
                 public R call() throws Exception {
                     Timer.Context timer = _executionTime.time();
-                    Stopwatch sw = Stopwatch.createStarted(_ticker);
+                    final long start = _ticker.read();
                     int numAttempts = 0;
 
                     try {
@@ -144,7 +143,7 @@ class AsyncServicePool<S> implements com.bazaarvoice.ostrich.AsyncServicePool<S>
                                 lastException = e;
                                 LOG.info("Retriable exception from end point id: " + endPoint.getId(), e);
                             }
-                        } while (retry.allowRetry(++numAttempts, sw.elapsed(TimeUnit.MILLISECONDS)));
+                        } while (retry.allowRetry(++numAttempts, TimeUnit.NANOSECONDS.toMillis(_ticker.read() - start)));
 
                         throw new MaxRetriesException(lastException);
                     } finally {
