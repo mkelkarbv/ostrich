@@ -23,7 +23,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
-import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
 import com.google.common.base.Ticker;
 import com.google.common.cache.CacheBuilder;
@@ -187,7 +186,7 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
 
     @Override
     public <R> R execute(PartitionContext partitionContext, RetryPolicy retry, ServiceCallback<S, R> callback) {
-        Stopwatch sw = new Stopwatch(_ticker).start();
+        final long start = _ticker.read();
         int numAttempts = 0;
         Exception lastException = null;
 
@@ -229,7 +228,7 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
                 LOG.debug("Exception", e);
                 lastException = e;
             }
-        } while (retry.allowRetry(++numAttempts, sw.elapsedMillis()));
+        } while (retry.allowRetry(++numAttempts, TimeUnit.NANOSECONDS.toMillis(_ticker.read() - start)));
 
         throw new MaxRetriesException(lastException);
     }
@@ -444,17 +443,23 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
         // We have to be very careful to not allow any exceptions to make it out of of this method, if they do then
         // subsequent scheduled invocations of the Runnable may not happen, and we could stop checking health checks
         // completely.  So we intentionally handle all possible exceptions here.
-        Stopwatch sw = new Stopwatch(_ticker).start();
+        final long start = _ticker.read();
 
+        boolean isHealthy = false;
+        Exception exception = null;
         try {
-            return  _serviceFactory.isHealthy(endPoint)
-                    ? new SuccessfulHealthCheckResult(endPoint.getId(), sw.stop().elapsedTime(TimeUnit.NANOSECONDS))
-                    : new FailedHealthCheckResult(endPoint.getId(), sw.stop().elapsedTime(TimeUnit.NANOSECONDS));
+            isHealthy = _serviceFactory.isHealthy(endPoint);
         } catch (Exception e) {
-            return new FailedHealthCheckResult(endPoint.getId(), sw.stop().elapsedTime(TimeUnit.NANOSECONDS), e);
-        } finally {
-            _healthCheckTime.update(sw.elapsedTime(TimeUnit.NANOSECONDS), TimeUnit.NANOSECONDS);
+            isHealthy = false;
+            exception = e;
         }
+        final long duration = _ticker.read() - start;
+        _healthCheckTime.update(duration, TimeUnit.NANOSECONDS);
+
+        return isHealthy
+            ? new SuccessfulHealthCheckResult(endPoint.getId(), duration)
+            : new FailedHealthCheckResult(endPoint.getId(), duration, exception);
+
     }
 
     @VisibleForTesting

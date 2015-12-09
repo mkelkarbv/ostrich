@@ -56,9 +56,9 @@ public class AsyncServicePoolTest {
     }
 
     @After
-    public void teardown() {
+    public void teardown() throws IOException {
         for (AsyncServicePool<Service> pool : _asyncServicePools) {
-            Closeables.closeQuietly(pool);
+            Closeables.close(pool, true);
         }
     }
 

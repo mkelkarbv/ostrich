@@ -8,7 +8,6 @@ import com.bazaarvoice.ostrich.ServiceEndPointPredicate;
 import com.bazaarvoice.ostrich.exceptions.MaxRetriesException;
 import com.bazaarvoice.ostrich.exceptions.NoAvailableHostsException;
 import com.bazaarvoice.ostrich.metrics.Metrics;
-import com.google.common.base.Stopwatch;
 import com.google.common.base.Ticker;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -123,7 +122,7 @@ class AsyncServicePool<S> implements com.bazaarvoice.ostrich.AsyncServicePool<S>
                 @Override
                 public R call() throws Exception {
                     TimerContext timer = _executionTime.time();
-                    Stopwatch sw = new Stopwatch(_ticker).start();
+                    final long start = _ticker.read();
                     int numAttempts = 0;
 
                     try {
@@ -145,7 +144,7 @@ class AsyncServicePool<S> implements com.bazaarvoice.ostrich.AsyncServicePool<S>
                                 lastException = e;
                                 LOG.info("Retriable exception from end point id: " + endPoint.getId(), e);
                             }
-                        } while (retry.allowRetry(++numAttempts, sw.elapsedMillis()));
+                        } while (retry.allowRetry(++numAttempts, TimeUnit.NANOSECONDS.toMillis(_ticker.read() - start)));
 
                         throw new MaxRetriesException(lastException);
                     } finally {
