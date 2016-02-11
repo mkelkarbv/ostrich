@@ -1,5 +1,7 @@
 package com.bazaarvoice.ostrich.pool;
 
+import yammercom.bazaarvoice.ostrich.pool.ServicePool;
+
 import java.util.concurrent.TimeUnit;
 
 /**

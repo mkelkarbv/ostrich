@@ -15,6 +15,7 @@ import com.google.common.base.Throwables;
 import com.google.common.base.Ticker;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import yammercom.bazaarvoice.ostrich.pool.ServicePool;
 
 import java.io.IOException;
 import java.util.List;
@@ -55,14 +56,14 @@ public class ServicePoolBuilder<S> {
      * may be specified.  The service pool will query the sources in the order they were registered and use the first
      * non-null {@link HostDiscovery} returned for the service name provided by the
      * {@link ServiceFactory#getServiceName()} method of the factory configured by {@link #withServiceFactory}.
-     * <p>
+     * <p/>
      * Note that using this method will cause the ServicePoolBuilder to call
      * {@link HostDiscoverySource#forService(String serviceName)} when {@link #build()} is called and pass the returned
      * {@link HostDiscovery} to the new {@code ServicePool}.  Subsequently calling {@link ServicePool#close()} will in
      * turn call {@link HostDiscovery#close()} on the passed instance.
      *
      * @param hostDiscoverySource a host discovery source to use to find the {@link HostDiscovery} when constructing
-     * the {@link ServicePool}
+     *                            the {@link ServicePool}
      * @return this
      */
     public ServicePoolBuilder<S> withHostDiscoverySource(HostDiscoverySource hostDiscoverySource) {
@@ -74,10 +75,10 @@ public class ServicePoolBuilder<S> {
      * Adds a {@link HostDiscovery} instance to the builder.  The service pool will use this {@code HostDiscovery}
      * instance unless a preceding {@link HostDiscoverySource} provides a non-null instance of {@code HostDiscovery} for
      * a given service name.
-     * <p>
+     * <p/>
      * Once this method is called, any subsequent calls to host discovery-related methods on this builder instance are
      * ignored (because this non-null discovery will always be returned).
-     * <p>
+     * <p/>
      * Note that callers of this method are responsible for calling {@link HostDiscovery#close} on the passed instance.
      *
      * @param hostDiscovery the host discovery instance to use in the built {@link ServicePool}
@@ -96,15 +97,16 @@ public class ServicePoolBuilder<S> {
 
     private ServicePoolBuilder<S> withHostDiscovery(HostDiscoverySource source, boolean close) {
         _hostDiscoverySources.add(close
-                ? new ClosingHostDiscoverySource(source)
-                : source);
+            ? new ClosingHostDiscoverySource(source)
+            : source);
         return this;
     }
 
     /**
      * Adds a {@code ServiceFactory} instance to the builder.  The {@code ServiceFactory#configure} method will be
      * called at this time to allow the {@code ServiceFactory} to set service pool settings on the builder.
-     * <p>
+     * <p/>
+     *
      * @param serviceFactory the ServiceFactory to use
      * @return this
      */
@@ -165,7 +167,7 @@ public class ServicePoolBuilder<S> {
      * may be used to service a particular request.
      *
      * @param partitionFilter The {@link PartitionFilter} to use
-     * @return  this
+     * @return this
      */
     public ServicePoolBuilder<S> withPartitionFilter(PartitionFilter partitionFilter) {
         _partitionFilter = checkNotNull(partitionFilter);
@@ -175,10 +177,10 @@ public class ServicePoolBuilder<S> {
     /**
      * Makes the built proxy generate partition context based on the {@link PartitionKey} annotation
      * on method arguments in class {@code S}.
-     * <p>
+     * <p/>
      * If {@code S} is not annotated, or annotated differently than desired, consider using
      * {@link #withPartitionContextAnnotationsFrom(Class)} instead.
-     * <p>
+     * <p/>
      * NOTE: This is only useful if building a proxy with {@link #buildProxy(com.bazaarvoice.ostrich.RetryPolicy)}.  If
      * partition context is necessary with a normal service pool, then can be provided directly by calling
      * {@link com.bazaarvoice.ostrich.ServicePool#execute(com.bazaarvoice.ostrich.PartitionContext,
@@ -192,7 +194,7 @@ public class ServicePoolBuilder<S> {
 
     /**
      * Uses {@link PartitionKey} annotations from the specified class to generate partition context in the built proxy.
-     * <p>
+     * <p/>
      * NOTE: This is only useful if building a proxy with {@link #buildProxy(com.bazaarvoice.ostrich.RetryPolicy)}.  If
      * partition context is necessary with a normal service pool, then can be provided directly by calling
      * {@link com.bazaarvoice.ostrich.ServicePool#execute(com.bazaarvoice.ostrich.PartitionContext,
@@ -238,9 +240,9 @@ public class ServicePoolBuilder<S> {
         boolean shutdownAsyncExecutorOnClose = (_asyncExecutor == null);
         if (_asyncExecutor == null) {
             ThreadFactory threadFactory = new ThreadFactoryBuilder()
-                    .setNameFormat(_serviceName + "-AsyncExecutorThread-%d")
-                    .setDaemon(true)
-                    .build();
+                .setNameFormat(_serviceName + "-AsyncExecutorThread-%d")
+                .setDaemon(true)
+                .build();
             _asyncExecutor = Executors.newCachedThreadPool(threadFactory);
         }
 
@@ -256,14 +258,13 @@ public class ServicePoolBuilder<S> {
      *
      * @param retryPolicy The retry policy to apply for every service call.
      * @return The dynamic proxy instance that implements the service interface {@code S} and the
-     *         {@link java.io.Closeable} interface.
+     * {@link java.io.Closeable} interface.
      */
     public S buildProxy(RetryPolicy retryPolicy) {
         return ServicePoolProxy.create(_serviceType, retryPolicy, build(), _partitionContextSupplier, true);
     }
 
-    @VisibleForTesting
-    ServicePool<S> buildInternal() {
+    @VisibleForTesting ServicePool<S> buildInternal() {
         checkNotNull(_serviceFactory);
 
         HostDiscovery hostDiscovery = findHostDiscovery(_serviceName);
@@ -277,15 +278,15 @@ public class ServicePoolBuilder<S> {
 
             if (_healthCheckExecutor == null) {
                 _healthCheckExecutor = Executors.newScheduledThreadPool(DEFAULT_NUM_HEALTH_CHECK_THREADS,
-                        new ThreadFactoryBuilder()
-                                .setNameFormat(_serviceName + "-HealthCheckThread-%d")
-                                .setDaemon(true)
-                                .build());
+                    new ThreadFactoryBuilder()
+                        .setNameFormat(_serviceName + "-HealthCheckThread-%d")
+                        .setDaemon(true)
+                        .build());
             }
 
             ServicePool<S> servicePool = new ServicePool<S>(Ticker.systemTicker(), hostDiscovery, _closeHostDiscovery,
-                    _serviceFactory, _cachingPolicy, _partitionFilter, _loadBalanceAlgorithm, _healthCheckExecutor,
-                    shutdownHealthCheckExecutorOnClose);
+                _serviceFactory, _cachingPolicy, _partitionFilter, _loadBalanceAlgorithm, _healthCheckExecutor,
+                shutdownHealthCheckExecutorOnClose);
 
             _closeHostDiscovery = false;
 

@@ -6,6 +6,7 @@ import com.bazaarvoice.ostrich.ServiceCallback;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
+import yammercom.bazaarvoice.ostrich.pool.ServicePool;
 
 import java.io.Closeable;
 import java.io.IOException;

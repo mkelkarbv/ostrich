@@ -27,6 +27,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Matchers;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
+import yammercom.bazaarvoice.ostrich.pool.ServicePool;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -446,7 +447,7 @@ public abstract class AbstractServicePoolTestingHarness {
         }
 
         // Make sure we added a health check.
-        verify(_healthCheckExecutor).submit(any(com.bazaarvoice.ostrich.pool.ServicePool.HealthCheck.class));
+        verify(_healthCheckExecutor).submit(any(ServicePool.HealthCheck.class));
     }
 
     @Test
@@ -466,7 +467,7 @@ public abstract class AbstractServicePoolTestingHarness {
         }
 
         // Make sure we didn't add a health check.
-        verify(_healthCheckExecutor, never()).submit(any(com.bazaarvoice.ostrich.pool.ServicePool.HealthCheck.class));
+        verify(_healthCheckExecutor, never()).submit(any(ServicePool.HealthCheck.class));
     }
 
     @Test
@@ -474,9 +475,9 @@ public abstract class AbstractServicePoolTestingHarness {
         // The pool was already created so the health check executor should have been used already.
 
         verify(_healthCheckExecutor).scheduleAtFixedRate(
-                any(com.bazaarvoice.ostrich.pool.ServicePool.BatchHealthChecks.class),
-                eq(com.bazaarvoice.ostrich.pool.ServicePool.HEALTH_CHECK_POLL_INTERVAL_IN_SECONDS),
-                eq(com.bazaarvoice.ostrich.pool.ServicePool.HEALTH_CHECK_POLL_INTERVAL_IN_SECONDS),
+            any(ServicePool.BatchHealthChecks.class),
+            eq(ServicePool.HEALTH_CHECK_POLL_INTERVAL_IN_SECONDS),
+            eq(ServicePool.HEALTH_CHECK_POLL_INTERVAL_IN_SECONDS),
                 eq(TimeUnit.SECONDS));
     }
 

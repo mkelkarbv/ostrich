@@ -3,7 +3,7 @@ package com.bazaarvoice.ostrich.pool;
 import com.bazaarvoice.ostrich.MultiThreadedServiceFactory;
 import com.bazaarvoice.ostrich.ServiceEndPoint;
 import com.bazaarvoice.ostrich.exceptions.NoCachedInstancesAvailableException;
-import com.bazaarvoice.ostrich.metrics.Metrics;
+import com.bazaarvoice.ostrich.metrics.yammer.metrics.Metrics;
 import com.bazaarvoice.ostrich.perftest.core.Result;
 import com.bazaarvoice.ostrich.perftest.core.ResultFactory;
 import com.bazaarvoice.ostrich.perftest.core.Service;

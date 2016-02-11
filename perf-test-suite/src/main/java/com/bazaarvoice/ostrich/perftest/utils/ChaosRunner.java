@@ -1,7 +1,7 @@
 package com.bazaarvoice.ostrich.perftest.utils;
 
 import com.bazaarvoice.ostrich.ServiceEndPoint;
-import com.bazaarvoice.ostrich.metrics.Metrics;
+import com.bazaarvoice.ostrich.metrics.yammer.metrics.Metrics;
 import com.bazaarvoice.ostrich.perftest.core.Service;
 import com.bazaarvoice.ostrich.pool.ServiceCache;
 import com.yammer.metrics.core.Meter;

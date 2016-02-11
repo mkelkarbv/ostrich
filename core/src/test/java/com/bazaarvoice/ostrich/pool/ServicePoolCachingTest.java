@@ -22,6 +22,7 @@ import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
+import yammercom.bazaarvoice.ostrich.pool.ServicePool;
 
 import java.io.IOException;
 import java.util.List;

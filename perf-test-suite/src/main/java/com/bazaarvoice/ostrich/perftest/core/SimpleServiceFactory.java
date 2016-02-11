@@ -2,7 +2,7 @@ package com.bazaarvoice.ostrich.perftest.core;
 
 import com.bazaarvoice.ostrich.MultiThreadedServiceFactory;
 import com.bazaarvoice.ostrich.ServiceEndPoint;
-import com.bazaarvoice.ostrich.metrics.Metrics;
+import com.bazaarvoice.ostrich.metrics.yammer.metrics.Metrics;
 import com.bazaarvoice.ostrich.perftest.utils.HashFunction;
 import com.bazaarvoice.ostrich.pool.ServicePoolBuilder;
 import com.yammer.metrics.core.Meter;

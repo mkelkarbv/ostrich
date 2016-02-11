@@ -2,6 +2,7 @@ package com.bazaarvoice.ostrich.pool;
 
 import com.bazaarvoice.ostrich.HealthCheckResults;
 import com.google.common.io.Closeables;
+import yammercom.bazaarvoice.ostrich.pool.ServicePool;
 
 import java.io.IOException;
 import java.lang.reflect.Proxy;

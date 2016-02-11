@@ -1,28 +1,24 @@
 package com.bazaarvoice.ostrich.metrics;
 
+import com.bazaarvoice.ostrich.metrics.yammer.YammerMetrics;
 import com.yammer.metrics.core.Gauge;
 import com.yammer.metrics.core.Metric;
 import com.yammer.metrics.core.MetricName;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Test;
 
-import java.lang.ref.WeakReference;
 import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.not;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
 
 public class MetricsTest {
     private static final Service INSTANCE_ONE = new Service();
     private static final Service INSTANCE_TWO = new Service();
 
-    private final Metrics _metrics = Metrics.forClass(Service.class);
+    private final YammerMetrics _metrics = YammerMetrics.forClass(Service.class);
 
     @After
     public void teardown() {
@@ -31,27 +27,27 @@ public class MetricsTest {
 
     @Test(expected = NullPointerException.class)
     public void testNullDomain() {
-        Metrics.forClass(null);
+        YammerMetrics.forClass(null);
     }
 
     @Test(expected = NullPointerException.class)
     public void testInstanceNullInstance() {
-        Metrics.forInstance(null, "scope");
+        YammerMetrics.forInstance(null, "scope");
     }
 
     @Test(expected = NullPointerException.class)
     public void testInstanceNullScope() {
-        Metrics.forInstance(this, null);
+        YammerMetrics.forInstance(this, null);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testInstanceEmptyScope() {
-        Metrics.forInstance(this, "");
+        YammerMetrics.forInstance(this, "");
     }
 
     @Test
     public void testInstanceInfersDomain() {
-        Metrics metrics = Metrics.forInstance(this, "scope");
+        YammerMetrics metrics = YammerMetrics.forInstance(this, "scope");
 
         assertEquals(new MetricName(getClass(), "name", "scope"), metrics.newName("scope", "name"));
 
@@ -69,7 +65,7 @@ public class MetricsTest {
     public void testNamesWithIdenticalScopes() {
         MetricName name1 = _metrics.newName("scope", "name");
         MetricName name2 = _metrics.newName("scope", "name");
-        assertEquals(name1, name2);
+        Assert.assertEquals(name1, name2);
     }
 
     @Test(expected = NullPointerException.class)
@@ -254,10 +250,10 @@ public class MetricsTest {
 
     @Test
     public void testInstanceGaugeReused() {
-        Metrics instancedMetrics = Metrics.forInstance(INSTANCE_ONE, "scope");
+        YammerMetrics instancedMetrics = YammerMetrics.forInstance(INSTANCE_ONE, "scope");
         Gauge<Integer> gauge = _metrics.addInstance(INSTANCE_TWO, "scope");
 
-        assertEquals(2, gauge.value().intValue());
+        Assert.assertEquals(2, gauge.value().intValue());
 
         instancedMetrics.close();
     }
@@ -273,7 +269,7 @@ public class MetricsTest {
 
     @Test
     public void testCloseUnregistersInstanceGauge() {
-        Metrics metrics = Metrics.forInstance(this, "scope");
+        YammerMetrics metrics = YammerMetrics.forInstance(this, "scope");
 
         metrics.close();
         assertNotRegistered("scope", "num-instances");
@@ -281,8 +277,8 @@ public class MetricsTest {
 
     @Test
     public void testCloseKeepsActiveInstanceGauge() {
-        Metrics metrics = Metrics.forInstance(INSTANCE_ONE, "scope");
-        Metrics moreMetrics = Metrics.forInstance(INSTANCE_TWO, "scope");
+        YammerMetrics metrics = YammerMetrics.forInstance(INSTANCE_ONE, "scope");
+        YammerMetrics moreMetrics = YammerMetrics.forInstance(INSTANCE_TWO, "scope");
 
         metrics.close();
         assertRegistered("scope", "num-instances");
@@ -295,13 +291,13 @@ public class MetricsTest {
         Gauge<Integer> gauge = _metrics.addInstance(this, "scope");
 
         _metrics.close();
-        assertEquals(0, gauge.value().intValue());
+        Assert.assertEquals(0, gauge.value().intValue());
     }
 
     @Test
     public void testCloseKeepsWhenActiveInstancesExist() {
-        Metrics metrics = Metrics.forInstance(INSTANCE_ONE, "scope");
-        Metrics moreMetrics = Metrics.forInstance(INSTANCE_TWO, "scope");
+        YammerMetrics metrics = YammerMetrics.forInstance(INSTANCE_ONE, "scope");
+        YammerMetrics moreMetrics = YammerMetrics.forInstance(INSTANCE_TWO, "scope");
 
         metrics.newCounter("scope", "name");
         moreMetrics.newCounter("scope", "name");
@@ -314,8 +310,8 @@ public class MetricsTest {
 
     @Test
     public void testCloseUnregistersDifferentScopeWhenActiveInstancesExist() {
-        Metrics metrics = Metrics.forInstance(INSTANCE_ONE, "scope");
-        Metrics moreMetrics = Metrics.forInstance(INSTANCE_TWO, "scope");
+        YammerMetrics metrics = YammerMetrics.forInstance(INSTANCE_ONE, "scope");
+        YammerMetrics moreMetrics = YammerMetrics.forInstance(INSTANCE_TWO, "scope");
 
         metrics.newCounter("different", "name");
 
@@ -327,8 +323,8 @@ public class MetricsTest {
 
     @Test
     public void testCloseUnregistersWhenLastActiveInstance() {
-        Metrics metrics = Metrics.forInstance(INSTANCE_ONE, "scope");
-        Metrics moreMetrics = Metrics.forInstance(INSTANCE_TWO, "scope");
+        YammerMetrics metrics = YammerMetrics.forInstance(INSTANCE_ONE, "scope");
+        YammerMetrics moreMetrics = YammerMetrics.forInstance(INSTANCE_TWO, "scope");
 
         metrics.newCounter("scope", "name");
         moreMetrics.newCounter("scope", "name");
@@ -355,17 +351,17 @@ public class MetricsTest {
     private void assertRegistered(String scope, String name) {
         MetricName metricName = _metrics.newName(scope, name);
         Metric metric = _metrics.getRegistry().allMetrics().get(metricName);
-        assertNotNull(metric);
+        Assert.assertNotNull(metric);
     }
 
     private void assertNotRegistered(String scope, String name) {
         MetricName metricName = _metrics.newName(scope, name);
         Metric metric = _metrics.getRegistry().allMetrics().get(metricName);
-        assertNull(metric);
+        Assert.assertNull(metric);
     }
 
     private static <T> void assertNotEquals(T a, T b) {
-        assertThat(a, not(equalTo(b)));
+        Assert.assertThat(a, not(equalTo(b)));
     }
 
     // Dummy class for testing.

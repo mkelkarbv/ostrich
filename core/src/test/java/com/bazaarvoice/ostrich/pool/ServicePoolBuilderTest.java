@@ -10,6 +10,7 @@ import com.bazaarvoice.ostrich.partition.IdentityPartitionFilter;
 import com.bazaarvoice.ostrich.partition.PartitionFilter;
 import org.junit.Before;
 import org.junit.Test;
+import yammercom.bazaarvoice.ostrich.pool.ServicePool;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -176,7 +177,7 @@ public class ServicePoolBuilderTest {
         HostDiscoverySource source = mock(HostDiscoverySource.class);
         when(source.forService(anyString())).thenReturn(overrideDiscovery);
 
-        com.bazaarvoice.ostrich.pool.ServicePool<Service> pool = ServicePoolBuilder.create(Service.class)
+        ServicePool<Service> pool = ServicePoolBuilder.create(Service.class)
                 .withHostDiscoverySource(source)
                 .withHostDiscovery(_hostDiscovery)
                 .withServiceFactory(_serviceFactory)
@@ -191,7 +192,7 @@ public class ServicePoolBuilderTest {
         HostDiscoverySource source = mock(HostDiscoverySource.class);
         when(source.forService(anyString())).thenReturn(null);
 
-        com.bazaarvoice.ostrich.pool.ServicePool<Service> pool = ServicePoolBuilder.create(Service.class)
+        ServicePool<Service> pool = ServicePoolBuilder.create(Service.class)
                 .withHostDiscoverySource(source)
                 .withHostDiscovery(_hostDiscovery)
                 .withServiceFactory(_serviceFactory)

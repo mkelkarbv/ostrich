@@ -88,7 +88,7 @@ public class CalculatorProxyUser {
         CalculatorServiceFactory serviceFactory = new CalculatorServiceFactory(config.getHttpClientConfiguration());
         CalculatorService service = ServicePoolBuilder.create(CalculatorService.class)
                 .withServiceFactory(serviceFactory)
-                .withHostDiscovery(new ZooKeeperHostDiscovery(curator, serviceFactory.getServiceName()))
+            .withHostDiscovery(new ZooKeeperHostDiscovery(curator, serviceFactory.getServiceName(), ))
                 .withCachingPolicy(cachingPolicy)
                 .buildProxy(new ExponentialBackoffRetry(5, 50, 1000, TimeUnit.MILLISECONDS));
 

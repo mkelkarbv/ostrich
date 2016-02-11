@@ -17,8 +17,8 @@ import com.bazaarvoice.ostrich.exceptions.NoCachedInstancesAvailableException;
 import com.bazaarvoice.ostrich.exceptions.NoSuitableHostsException;
 import com.bazaarvoice.ostrich.exceptions.OnlyBadHostsException;
 import com.bazaarvoice.ostrich.healthcheck.DefaultHealthCheckResults;
-import com.bazaarvoice.ostrich.metrics.Metrics;
 import com.bazaarvoice.ostrich.partition.PartitionFilter;
+import com.bazaarvoice.ostrich.spi.ScopedMetrics;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.base.Predicate;
@@ -30,12 +30,9 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.yammer.metrics.core.Gauge;
-import com.yammer.metrics.core.Meter;
-import com.yammer.metrics.core.Timer;
-import com.yammer.metrics.core.TimerContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import yammercom.bazaarvoice.ostrich.pool.ServicePool;
 
 import java.io.IOException;
 import java.util.Set;
@@ -45,7 +42,7 @@ import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
+public class CoreServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
     private static final Logger LOG = LoggerFactory.getLogger(ServicePool.class);
 
     // By default check every minute to see if a previously unhealthy end point has become healthy.
@@ -67,16 +64,17 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
     private final Set<ServiceEndPoint> _recentlyRemovedEndPoints;
     private final Future<?> _batchHealthChecksFuture;
     private final ServiceCache<S> _serviceCache;
-    private final Metrics _metrics;
-    private final Timer _callbackExecutionTime;
-    private final Timer _healthCheckTime;
-    private final Meter _numExecuteSuccesses;
-    private final Meter _numExecuteAttemptFailures;
+    protected final ScopedMetrics _metrics;
+    private final com.bazaarvoice.ostrich.spi.Timer _callbackExecutionTime;
+    private final com.bazaarvoice.ostrich.spi.Timer _healthCheckTime;
+    private final com.bazaarvoice.ostrich.spi.Meter _numExecuteSuccesses;
+    private final com.bazaarvoice.ostrich.spi.Meter _numExecuteAttemptFailures;
 
-    ServicePool(Ticker ticker, HostDiscovery hostDiscovery, boolean cleanupHostDiscoveryOnClose,
-                ServiceFactory<S> serviceFactory, ServiceCachingPolicy cachingPolicy,
-                PartitionFilter partitionFilter, LoadBalanceAlgorithm loadBalanceAlgorithm,
-                ScheduledExecutorService healthCheckExecutor, boolean shutdownHealthCheckExecutorOnClose) {
+    public CoreServicePool(Ticker ticker, HostDiscovery hostDiscovery, boolean cleanupHostDiscoveryOnClose,
+                           ServiceFactory<S> serviceFactory, ServiceCachingPolicy cachingPolicy,
+                           PartitionFilter partitionFilter, LoadBalanceAlgorithm loadBalanceAlgorithm,
+                           ScheduledExecutorService healthCheckExecutor, boolean shutdownHealthCheckExecutorOnClose,
+                           ScopedMetrics metrics) {
         _ticker = checkNotNull(ticker);
         _hostDiscovery = checkNotNull(hostDiscovery);
         _cleanupHostDiscoveryOnClose = cleanupHostDiscoveryOnClose;
@@ -86,15 +84,15 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
         _badEndPoints = Sets.newSetFromMap(Maps.<ServiceEndPoint, Boolean>newConcurrentMap());
         _badEndPointFilter = Predicates.not(Predicates.in(_badEndPoints));
         _recentlyRemovedEndPoints = Sets.newSetFromMap(CacheBuilder.newBuilder()
-                .ticker(_ticker)
-                .expireAfterWrite(10, TimeUnit.MINUTES)  // TODO: Make this a constant
-                .<ServiceEndPoint, Boolean>build()
-                .asMap());
+            .ticker(_ticker)
+            .expireAfterWrite(10, TimeUnit.MINUTES)  // TODO: Make this a constant
+            .<ServiceEndPoint, Boolean>build()
+            .asMap());
         checkNotNull(cachingPolicy);
         _serviceCache = new ServiceCacheBuilder<S>()
-                .withServiceFactory(serviceFactory)
-                .withCachingPolicy(cachingPolicy)
-                .build();
+            .withServiceFactory(serviceFactory)
+            .withCachingPolicy(cachingPolicy)
+            .build();
         _partitionFilter = checkNotNull(partitionFilter);
         _loadBalanceAlgorithm = checkNotNull(loadBalanceAlgorithm);
 
@@ -134,23 +132,23 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
 
         // Periodically wake up and check any bad end points to see if they're now healthy.
         _batchHealthChecksFuture = _healthCheckExecutor.scheduleAtFixedRate(new BatchHealthChecks(),
-                HEALTH_CHECK_POLL_INTERVAL_IN_SECONDS, HEALTH_CHECK_POLL_INTERVAL_IN_SECONDS, TimeUnit.SECONDS);
+            HEALTH_CHECK_POLL_INTERVAL_IN_SECONDS, HEALTH_CHECK_POLL_INTERVAL_IN_SECONDS, TimeUnit.SECONDS);
 
         String serviceName = _serviceFactory.getServiceName();
-        _metrics = Metrics.forInstance(this, serviceName);
+        _metrics = metrics;
         _callbackExecutionTime = _metrics.newTimer(serviceName, "callback-execution-time", TimeUnit.MILLISECONDS,
-                TimeUnit.SECONDS);
+            TimeUnit.SECONDS);
         _healthCheckTime = _metrics.newTimer(serviceName, "health-check-time", TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
         _numExecuteSuccesses = _metrics.newMeter(serviceName, "num-execute-successes", "successes", TimeUnit.SECONDS);
         _numExecuteAttemptFailures = _metrics.newMeter(serviceName, "num-execute-attempt-failures", "failures",
-                TimeUnit.SECONDS);
-        _metrics.newGauge(serviceName, "num-valid-end-points", new Gauge<Integer>() {
+            TimeUnit.SECONDS);
+        _metrics.registerGauge(serviceName, "num-valid-end-points", new com.bazaarvoice.ostrich.spi.Gauge<Integer>() {
             @Override
             public Integer value() {
                 return getNumValidEndPoints();
             }
         });
-        _metrics.newGauge(serviceName, "num-bad-end-points", new Gauge<Integer>() {
+        _metrics.registerGauge(serviceName, "num-bad-end-points", new com.bazaarvoice.ostrich.spi.Gauge<Integer>() {
             @Override
             public Integer value() {
                 return getNumBadEndPoints();
@@ -172,7 +170,6 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
         }
 
         _serviceCache.close();
-        _metrics.close();
 
         if (_shutdownHealthCheckExecutorOnClose) {
             _healthCheckExecutor.shutdownNow();
@@ -194,22 +191,22 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
             Iterable<ServiceEndPoint> allEndPoints = getAllEndPoints();
             if (Iterables.isEmpty(allEndPoints)) {
                 throw (lastException == null)
-                        ? new NoAvailableHostsException()
-                        : new NoAvailableHostsException(lastException);
+                    ? new NoAvailableHostsException()
+                    : new NoAvailableHostsException(lastException);
             }
 
             Iterable<ServiceEndPoint> validEndPoints = getValidEndPoints(allEndPoints);
             if (Iterables.isEmpty(validEndPoints)) {
                 throw (lastException == null)
-                        ? new OnlyBadHostsException()
-                        : new OnlyBadHostsException(lastException);
+                    ? new OnlyBadHostsException()
+                    : new OnlyBadHostsException(lastException);
             }
 
             ServiceEndPoint endPoint = chooseEndPoint(validEndPoints, partitionContext);
             if (endPoint == null) {
                 throw (lastException == null)
-                        ? new NoSuitableHostsException()
-                        : new NoSuitableHostsException(lastException);
+                    ? new NoSuitableHostsException()
+                    : new NoSuitableHostsException(lastException);
             }
 
             try {
@@ -285,7 +282,7 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
         try {
             handle = _serviceCache.checkOut(endPoint);
 
-            TimerContext timer = _callbackExecutionTime.time();
+            com.bazaarvoice.ostrich.spi.TimerContext timer = _callbackExecutionTime.time();
             try {
                 return callback.call(handle.getService());
             } finally {
@@ -311,7 +308,7 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
                 } catch (Exception e) {
                     // This should never happen, but log just in case.
                     LOG.warn("Error returning end point to cache. End point ID: {}, {}",
-                            endPoint.getId(), e.toString());
+                        endPoint.getId(), e.toString());
                     LOG.debug("Exception", e);
                 }
             }
@@ -329,34 +326,30 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
 
     /**
      * NOTE: This method is package private specifically so that {@link AsyncServicePool} can call it.
+     *
      * @return The name of the service for this pool.
      */
     String getServiceName() {
         return _serviceFactory.getServiceName();
     }
 
-    @VisibleForTesting
-    HostDiscovery getHostDiscovery() {
+    @VisibleForTesting HostDiscovery getHostDiscovery() {
         return _hostDiscovery;
     }
 
-    @VisibleForTesting
-    PartitionFilter getPartitionFilter() {
+    @VisibleForTesting PartitionFilter getPartitionFilter() {
         return _partitionFilter;
     }
 
-    @VisibleForTesting
-    LoadBalanceAlgorithm getLoadBalanceAlgorithm() {
+    @VisibleForTesting LoadBalanceAlgorithm getLoadBalanceAlgorithm() {
         return _loadBalanceAlgorithm;
     }
 
-    @VisibleForTesting
-    ServicePoolStatistics getServicePoolStatistics() {
+    @VisibleForTesting ServicePoolStatistics getServicePoolStatistics() {
         return _servicePoolStatistics;
     }
 
-    @VisibleForTesting
-    Set<ServiceEndPoint> getBadEndPoints() {
+    @VisibleForTesting Set<ServiceEndPoint> getBadEndPoints() {
         return ImmutableSet.copyOf(_badEndPoints);
     }
 
@@ -525,8 +518,8 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
         @Override
         public String toString() {
             return Objects.toStringHelper(this)
-                    .add("endPointId", _endPointId)
-                    .toString();
+                .add("endPointId", _endPointId)
+                .toString();
         }
     }
 
@@ -567,9 +560,9 @@ class ServicePool<S> implements com.bazaarvoice.ostrich.ServicePool<S> {
         @Override
         public String toString() {
             return Objects.toStringHelper(this)
-                    .add("endPointId", _endPointId)
-                    .add("exception", _exception)
-                    .toString();
+                .add("endPointId", _endPointId)
+                .add("exception", _exception)
+                .toString();
         }
     }
 }

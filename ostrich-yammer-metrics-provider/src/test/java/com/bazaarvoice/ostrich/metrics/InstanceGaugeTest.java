@@ -1,5 +1,6 @@
 package com.bazaarvoice.ostrich.metrics;
 
+import com.bazaarvoice.ostrich.spi.InstanceGauge;
 import org.junit.Test;
 
 import java.lang.ref.Reference;

@@ -97,5 +97,10 @@
         <module>dropwizard</module>
         <module>zookeeper</module>
         <module>examples</module>
+        <module>spi</module>
+        <module>metrics-provider</module>
+        <module>ostrich-core-zookeeper</module>
+        <module>ostrich-core-noopmetrics</module>
+        <module>noop-metrics-provider</module>
     </modules>
 </project>
